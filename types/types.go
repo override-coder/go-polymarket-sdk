@@ -27,3 +27,17 @@ type ApiKeyCreds struct {
 	Secret     string `json:"secret"`
 	Passphrase string `json:"passphrase"`
 }
+
+// BuilderApiKeyCreds Builder API密钥
+type BuilderApiKeyCreds struct {
+	Key        string `json:"key"`
+	Secret     string `json:"secret"`
+	Passphrase string `json:"passphrase"`
+}
+
+// BuilderApiKeyResponse Builder API密钥响应
+type BuilderApiKeyResponse struct {
+	Key       string `json:"key"`
+	CreatedAt string `json:"createdAt,omitempty"`
+	RevokedAt string `json:"revokedAt,omitempty"`
+}

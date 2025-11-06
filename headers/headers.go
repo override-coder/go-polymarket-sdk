@@ -65,7 +65,7 @@ func CreateL2Headers(
 }
 
 func CreateL2BuilderHeaders(
-	creds *types.BuilderApiKeyCreds,
+	creds *sdktypes.BuilderApiKeyCreds,
 	headerArgs types.L2HeaderArgs,
 	tsOpt *int64,
 ) (map[string]string, error) {

@@ -56,7 +56,11 @@ func TestGetTickSize(t *testing.T) {
 }
 
 func TestPostOrder(t *testing.T) {
-	client := clob.NewClient(PolymarketClobURL, chaindId, signature, nil)
+	client := clob.NewClient(PolymarketClobURL, chaindId, signature, &sdktypes.BuilderApiKeyCreds{
+		Key:        "019a4dec-fc6a-79ba-8937-d9bf3c2792ca",
+		Secret:     "Q23ZHyR21V5_F8qVLvOvnXGhxtW6CmNCWDjHzFJQW7k=",
+		Passphrase: "2a171196ddfe34aab62eea32ed63fe424fde8144413982dd90527c844cf2e8d3",
+	})
 
 	authOption := &sdktypes.AuthOption{
 		SignatureType: model.POLY_GNOSIS_SAFE,

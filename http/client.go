@@ -18,9 +18,7 @@ func NewClient(host string) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
-	return &Client{
-		client: resty.New().SetBaseURL(host),
-	}
+	return &Client{client: resty.New().SetBaseURL(host)}
 }
 
 type RequestOptions struct {

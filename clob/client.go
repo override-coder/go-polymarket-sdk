@@ -4,6 +4,7 @@ import (
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	"github.com/override-coder/go-polymarket-sdk/signing"
+	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
 	"github.com/override-coder/go-polymarket-sdk/types/utils"
 	"math/big"
 	"net/http"
@@ -16,7 +17,7 @@ type Client struct {
 	chainId *big.Int
 	signFn  signing.SignatureFunc
 
-	builderApiKeyCreds *types.BuilderApiKeyCreds
+	builderApiKeyCreds *sdktypes.BuilderApiKeyCreds
 
 	orderBuilder *OrderBuilder
 
@@ -25,7 +26,7 @@ type Client struct {
 	feeRates  types.FeeRates
 }
 
-func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, builderApiKeyCreds *types.BuilderApiKeyCreds) *Client {
+func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, builderApiKeyCreds *sdktypes.BuilderApiKeyCreds) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
