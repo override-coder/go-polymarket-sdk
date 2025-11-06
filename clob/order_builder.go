@@ -91,8 +91,8 @@ func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingCon
 func (o *OrderBuilder) buildOrderCreationArgs(order types.UserOrder, roundConfig RoundConfig, option *sdktypes.AuthOption) *model.OrderData {
 
 	side, makerAmt, takerAmt := getOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
-	makerAmount := utils.Pow(utils.Float64ToDecimal(makerAmt), 6)
-	takerAmount := utils.Pow(utils.Float64ToDecimal(takerAmt), 6)
+	makerAmount := utils.Pow(utils.Float64ToDecimal(makerAmt), types.CollateralTokenDecimals)
+	takerAmount := utils.Pow(utils.Float64ToDecimal(takerAmt), types.ConditionalTokenDecimals)
 
 	maker := option.SingerAddress
 	if !strings.EqualFold(option.FunderAddress, "") {

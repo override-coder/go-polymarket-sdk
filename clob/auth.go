@@ -3,6 +3,7 @@ package clob
 import (
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	"github.com/override-coder/go-polymarket-sdk/headers"
+	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
 	"math/big"
 	"net/http"
@@ -29,10 +30,10 @@ func (c *Client) CreateApiKey(nonce *big.Int, option *sdktypes.AuthOption) (*sdk
 		return nil, err
 	}
 	var raw *sdktypes.ApiKeyCreds
-	resp, err := c.doRequest(http.MethodPost, types.CREATE_API_KEY, &RequestOptions{
+	resp, err := c.client.DoRequest(http.MethodPost, types.CREATE_API_KEY, &http2.RequestOptions{
 		Headers: l1Headers,
 	}, &raw)
-	if _, e := parseHTTPError(resp, err); e != nil {
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
 	return raw, nil
@@ -45,10 +46,10 @@ func (c *Client) DeriveAPIKey(nonce *big.Int, option *sdktypes.AuthOption) (*sdk
 		return nil, err
 	}
 	var raw *sdktypes.ApiKeyCreds
-	resp, err := c.doRequest(http.MethodGet, types.DERIVE_API_KEY, &RequestOptions{
+	resp, err := c.client.DoRequest(http.MethodGet, types.DERIVE_API_KEY, &http2.RequestOptions{
 		Headers: l1Headers,
 	}, &raw)
-	if _, e := parseHTTPError(resp, err); e != nil {
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
 	return raw, nil

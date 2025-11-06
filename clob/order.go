@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	sdkheaders "github.com/override-coder/go-polymarket-sdk/headers"
+	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
 	"github.com/override-coder/go-polymarket-sdk/types/utils"
 	"github.com/pkg/errors"
@@ -77,11 +78,11 @@ func (c *Client) postOrder(order *model.SignedOrder, orderType types.OrderType, 
 	}
 
 	var out types.OrderResponse
-	resp, err := c.doRequest(http.MethodPost, types.POST_ORDER, &RequestOptions{
+	resp, err := c.client.DoRequest(http.MethodPost, types.POST_ORDER, &http2.RequestOptions{
 		Headers: headers,
 		Data:    bodyStr,
 	}, &out)
-	if _, e := parseHTTPError(resp, err); e != nil {
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
 	return &out, nil
