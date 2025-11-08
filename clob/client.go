@@ -6,6 +6,7 @@ import (
 	"github.com/override-coder/go-polymarket-sdk/signing"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
 	"github.com/override-coder/go-polymarket-sdk/types/utils"
+	"github.com/pkg/errors"
 	"math/big"
 	"net/http"
 	"strings"
@@ -40,6 +41,14 @@ func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, buil
 		negRisk:            make(types.NegRisks, 500),
 		feeRates:           make(types.FeeRates, 500),
 	}
+}
+
+func (c *Client) WithSignatureFunc(signFn signing.SignatureFunc) error {
+	if c.signFn != nil {
+		return errors.New("signFn already set")
+	}
+	c.signFn = signFn
+	return nil
 }
 
 func (c *Client) GetTickSize(tokenID string) (string, error) {

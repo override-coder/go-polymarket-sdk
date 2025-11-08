@@ -40,6 +40,14 @@ func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, buil
 	}
 }
 
+func (c *Client) WithSignatureFunc(signFn signing.SignatureFunc) error {
+	if c.signFn != nil {
+		return errors.New("signFn already set")
+	}
+	c.signFn = signFn
+	return nil
+}
+
 func (c *Client) GetNonce(signerAddress string, signerType types.TransactionType) (types.NoncePayload, error) {
 	var resp types.NoncePayload
 	res, err := c.client.DoRequest(http.MethodGet, types.GET_NONCE, &http2.RequestOptions{
