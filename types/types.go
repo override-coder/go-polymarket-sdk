@@ -30,9 +30,9 @@ type ApiKeyCreds struct {
 
 // BuilderApiKeyCreds Builder API密钥
 type BuilderApiKeyCreds struct {
-	Key        string `json:"key"`
-	Secret     string `json:"secret"`
-	Passphrase string `json:"passphrase"`
+	Key        string `json:"key" yaml:"key" mapstructure:"key"`
+	Secret     string `json:"secret" yaml:"secret" mapstructure:"secret"`
+	Passphrase string `json:"passphrase" yaml:"passphrase" mapstructure:"passphrase"`
 }
 
 // BuilderApiKeyResponse Builder API密钥响应
