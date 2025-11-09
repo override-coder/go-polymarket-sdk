@@ -200,3 +200,25 @@ func (c *Client) GetUserActivity(q types.ActivityQuery) ([]types.UserActivity, e
 	}
 	return out, nil
 }
+
+func (c *Client) GetPositionValue(q types.PositionValueQuery) ([]types.PositionValue, error) {
+	if strings.TrimSpace(q.User) == "" {
+		return nil, fmt.Errorf("user is required")
+	}
+	params := map[string]any{
+		"user": q.User,
+	}
+	if len(q.Market) > 0 {
+		params["market"] = strings.Join(q.Market, ",")
+	}
+
+	var out []types.PositionValue
+	resp, err := c.client.DoRequest(http.MethodGet, types.GET_VALUE, &http2.RequestOptions{
+		Params: params,
+	}, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return out, nil
+
+}

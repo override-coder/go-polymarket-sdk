@@ -28,4 +28,9 @@ func TestGetPositions(t *testing.T) {
 	assert.Equal(t, nil, err)
 	t.Logf("activitys: %v", activity)
 
+	value, err := client.GetPositionValue(types.PositionValueQuery{
+		User: "0x4b5bB26F866d98B2C92096fD6d80D6D01B6313f5",
+	})
+	assert.Equal(t, nil, err)
+	t.Logf("value: %v", value)
 }

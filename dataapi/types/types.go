@@ -126,3 +126,14 @@ type UserActivity struct {
 	ProfileImage          string  `json:"profileImage"`
 	ProfileImageOptimized string  `json:"profileImageOptimized"`
 }
+
+type PositionValueQuery struct {
+	User   string   // required
+	Market []string // conditionIds (0x+64hex), mutually exclusive with EventID
+
+}
+
+type PositionValue struct {
+	User  string  `json:"user"`
+	Value float64 `json:"value"`
+}
