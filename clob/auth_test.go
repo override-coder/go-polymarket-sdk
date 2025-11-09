@@ -41,16 +41,16 @@ func TestClient(t *testing.T) {
 
 func TestGetTickSize(t *testing.T) {
 	client := clob.NewClient(PolymarketClobURL, chaindId, signature, nil)
-	tokenID := "9271150303929886170307880275525448524362138570132971024043819830163602744465"
+	tokenID := "108743709732442130739073851488597967747030701044009651663118921104082786836017"
 	size, err := client.GetTickSize(tokenID)
 	assert.Nil(t, err)
 	t.Logf("%+v", size)
 
-	risk, err := client.GetNegRisk(tokenID)
+	risk, err := client.GetOrderBook(tokenID)
 	assert.Nil(t, err)
 	t.Logf("%+v", risk)
 
-	rateBps, err := client.GetFeeRateBps(tokenID)
+	rateBps, err := client.GetMarketPrice(tokenID, "BUY")
 	assert.Nil(t, err)
 	t.Logf("%+v", rateBps)
 }

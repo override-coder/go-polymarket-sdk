@@ -119,3 +119,25 @@ func (c *Client) GetFeeRateBps(tokenID string) (float64, error) {
 
 	return baseFee, nil
 }
+
+func (c *Client) GetOrderBook(tokenID string) (*types.OrderBookSummary, error) {
+	var resp types.OrderBookSummary
+	res, err := c.client.DoRequest(http.MethodGet, types.GET_ORDER_BOOK, &http2.RequestOptions{
+		Params: map[string]any{"token_id": tokenID},
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrap(e, "get order book")
+	}
+	return &resp, nil
+}
+
+func (c *Client) GetMarketPrice(tokenID, side string) (string, error) {
+	var resp map[string]string
+	res, err := c.client.DoRequest(http.MethodGet, types.GET_PRICE, &http2.RequestOptions{
+		Params: map[string]any{"token_id": tokenID, "side": side},
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return "", errors.Wrap(e, "get market price")
+	}
+	return resp["price"], nil
+}

@@ -1,6 +1,7 @@
 package relayer_test
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -9,16 +10,18 @@ import (
 	"github.com/override-coder/go-polymarket-sdk/relayer"
 	"github.com/override-coder/go-polymarket-sdk/relayer/types"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
+	"github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
 	PolymarketRelayURL = "https://relayer-v2.polymarket.com"
 	chaindId           = big.NewInt(137)
-	privateKey, _      = crypto.ToECDSA(common.Hex2Bytes(""))
+	privateKey, _      = crypto.ToECDSA(common.Hex2Bytes("3f26dbcf904a3542e5f54eed3381c740d6246d8bc81cefbfd0679ae4ce8d82c9"))
 )
 
 func signature(signer string, digest []byte) ([]byte, error) {
@@ -40,6 +43,22 @@ func TestClient_GetNonce(t *testing.T) {
 	transactions, err := client.GetTransactions()
 	assert.Equal(t, nil, err)
 	t.Logf("transactions: %v", transactions)
+}
+
+func TestProxy(t *testing.T) {
+	client := relayer.NewClient(PolymarketRelayURL, chaindId, signature, &sdktypes.BuilderApiKeyCreds{
+		Key:        "019a4dec-fc6a-79ba-8937-d9bf3c2792ca",
+		Secret:     "Q23ZHyR21V5_F8qVLvOvnXGhxtW6CmNCWDjHzFJQW7k=",
+		Passphrase: "2a171196ddfe34aab62eea32ed63fe424fde8144413982dd90527c844cf2e8d3",
+	})
+	response, err := client.Deploy(&sdktypes.AuthOption{
+		SignatureType: model.POLY_GNOSIS_SAFE,
+		SingerAddress: "0x2061452270d3E93A37B72062d10e68Ec46d4A304",
+	})
+	assert.NoError(t, err)
+	state, err := client.PollUntilState(context.Background(), response.TransactionID, []types.RelayerTransactionState{types.RelayerStateConfirmed}, nil, 10, 5*time.Second)
+	assert.Equal(t, nil, err)
+	t.Logf("state: %v", state)
 }
 
 func TestGetExpectedSafe(t *testing.T) {

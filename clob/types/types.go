@@ -131,3 +131,20 @@ type TickSizes map[string]TickSize
 type NegRisks map[string]bool
 type FeeRates map[string]float64
 type RewardsPercentages map[string]float64
+
+type OrderBookSummary struct {
+	Market       string         `json:"market"`
+	AssetID      string         `json:"asset_id"`
+	Timestamp    string         `json:"timestamp"`
+	Bids         []OrderSummary `json:"bids"`
+	Asks         []OrderSummary `json:"asks"`
+	MinOrderSize string         `json:"min_order_size"`
+	TickSize     string         `json:"tick_size"`
+	NegRisk      bool           `json:"neg_risk"`
+	Hash         string         `json:"hash"`
+}
+
+type OrderSummary struct {
+	Price string `json:"price"`
+	Size  string `json:"size"`
+}
