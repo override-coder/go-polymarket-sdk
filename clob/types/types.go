@@ -148,3 +148,39 @@ type OrderSummary struct {
 	Price string `json:"price"`
 	Size  string `json:"size"`
 }
+
+type GetOrderRequest struct {
+	ID string `json:"id,omitempty"`
+}
+
+// OpenOrder 对象
+type OpenOrder struct {
+	AssociateTrades []string `json:"associate_trades"`
+	ID              string   `json:"id"`
+	Status          string   `json:"status"`
+	Market          string   `json:"market"`
+	OriginalSize    string   `json:"original_size"`
+	Outcome         string   `json:"outcome"`
+	Owner           string   `json:"owner"`
+	Price           string   `json:"price"`
+	Side            string   `json:"side"`
+	SizeMatched     string   `json:"size_matched"`
+	AssetID         string   `json:"asset_id"`
+	Expiration      string   `json:"expiration"`
+	Type            string   `json:"type"`
+	CreatedAt       uint64   `json:"created_at"`
+}
+
+type GetActiveOrdersRequest struct {
+	ID      string `json:"id,omitempty" url:"id,omitempty"`
+	Market  string `json:"market,omitempty" url:"market,omitempty"`
+	AssetID string `json:"asset_id,omitempty" url:"asset_id,omitempty"`
+}
+
+// OpenOrders 响应体
+type OpenOrders struct {
+	Data       []OpenOrder `json:"data"`
+	NextCursor string      `json:"next_cursor"`
+	Limit      int         `json:"limit"`
+	Count      int         `json:"count"`
+}

@@ -67,13 +67,13 @@ const (
 
 	CANCEL_ORDERS = "/orders"
 
-	GET_ORDER = "/dataapi/order/"
+	GET_ORDER = "/data/order/"
 
 	CANCEL_ALL = "/cancel-all"
 
 	CANCEL_MARKET_ORDERS = "/cancel-market-orders"
 
-	GET_OPEN_ORDERS = "/dataapi/orders"
+	GET_OPEN_ORDERS = "/data/orders"
 
 	GET_TRADES = "/dataapi/trades"
 

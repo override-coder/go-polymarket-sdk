@@ -70,6 +70,16 @@ func TestPostOrder(t *testing.T) {
 	_, err := client.EnsureAPIKey(big.NewInt(0), authOption)
 	assert.Nil(t, err)
 
+	orders, err := client.GetOrders(types.GetActiveOrdersRequest{}, authOption)
+	assert.Nil(t, err)
+
+	if len(orders.Data) > 0 {
+		getOrder, err := client.GetOrder(orders.Data[0].ID, types.GetOrderRequest{}, authOption)
+		assert.Nil(t, err)
+		t.Logf("%+v", getOrder)
+	}
+
+	return
 	expiration := time.Now().Add(2 * time.Minute).Unix()
 	userOrder := types.UserOrder{
 		TokenID:    "29932229206038996544221694126815434341861961592336413071656609906503218641045",

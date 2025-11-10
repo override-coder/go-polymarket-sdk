@@ -2,6 +2,7 @@ package clob
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	sdkheaders "github.com/override-coder/go-polymarket-sdk/headers"
@@ -113,4 +114,67 @@ func orderToJson(order *model.SignedOrder, owner string, orderType *types.OrderT
 		OrderType: *orderType,
 		DeferExec: deferExec,
 	}
+}
+
+func (c *Client) GetOrder(orderId string, req types.GetOrderRequest, option *sdktypes.AuthOption) (*types.OpenOrder, error) {
+	requestPath := fmt.Sprintf("%s%s", types.GET_ORDER, orderId)
+
+	ts := time.Now().Unix()
+	l2HeaderArgs := types.L2HeaderArgs{
+		Method:      http.MethodGet,
+		RequestPath: requestPath,
+	}
+
+	params := make(map[string]any, 3)
+	if req.ID != "" {
+		params["id"] = req.ID
+	}
+
+	l2Headers, err := sdkheaders.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create l2 headers")
+	}
+
+	var resp types.OpenOrder
+	res, err := c.client.DoRequest(http.MethodGet, requestPath, &http2.RequestOptions{
+		Headers: l2Headers,
+		Params:  params,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrapf(e, "get order buy id:%v", params)
+	}
+	return &resp, nil
+}
+
+func (c *Client) GetOrders(req types.GetActiveOrdersRequest, option *sdktypes.AuthOption) (*types.OpenOrders, error) {
+	ts := time.Now().Unix()
+	l2HeaderArgs := types.L2HeaderArgs{
+		Method:      http.MethodGet,
+		RequestPath: types.GET_OPEN_ORDERS,
+	}
+	l2Headers, err := sdkheaders.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create l2 headers")
+	}
+
+	params := make(map[string]any, 3)
+	if req.ID != "" {
+		params["id"] = req.ID
+	}
+	if req.Market != "" {
+		params["market"] = req.Market
+	}
+	if req.AssetID != "" {
+		params["asset_id"] = req.AssetID
+	}
+
+	var resp types.OpenOrders
+	res, err := c.client.DoRequest(http.MethodGet, types.GET_OPEN_ORDERS, &http2.RequestOptions{
+		Headers: l2Headers,
+		Params:  params,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrap(e, "get orders")
+	}
+	return &resp, nil
 }
