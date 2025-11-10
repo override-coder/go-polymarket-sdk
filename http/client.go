@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
@@ -18,7 +19,13 @@ func NewClient(host string) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
-	return &Client{client: resty.New().SetBaseURL(host)}
+	return &Client{client: resty.New().
+		SetBaseURL(host).
+		SetTimeout(15 * time.Second).
+		SetRetryCount(2).
+		SetRetryWaitTime(300 * time.Millisecond).
+		SetRetryMaxWaitTime(3 * time.Second),
+	}
 }
 
 type RequestOptions struct {
@@ -27,19 +34,20 @@ type RequestOptions struct {
 	Params  map[string]any
 }
 
-func (c *Client) withDefaults() *resty.Client {
-	return c.client.
-		SetTimeout(15*time.Second).
-		SetRetryCount(2).
-		SetRetryWaitTime(300*time.Millisecond).
-		SetHeader("Accept", "*/*").
-		SetHeader("Connection", "keep-alive").
-		SetHeader("User-Agent", "@polymarket/go-polymarket-sdk").
-		SetHeader("Content-Type", "application/json")
+// 仅设置本次请求的默认 Header（不要再改 client 级 Header）
+func (c *Client) newRequest(ctx context.Context) *resty.Request {
+	r := c.client.R()
+	if ctx != nil {
+		r.SetContext(ctx)
+	}
+	r.SetHeader("Accept", "*/*")
+	r.SetHeader("Connection", "keep-alive")
+	r.SetHeader("User-Agent", "@polymarket/go-polymarket-sdk")
+	return r
 }
 
 func (c *Client) DoRequest(method, endpoint string, opt *RequestOptions, out any) (*resty.Response, error) {
-	rc := c.withDefaults().R()
+	rc := c.newRequest(context.Background())
 	if opt != nil {
 		if opt.Headers != nil {
 			for k, v := range opt.Headers {
@@ -52,10 +60,13 @@ func (c *Client) DoRequest(method, endpoint string, opt *RequestOptions, out any
 		if opt.Data != nil {
 			switch b := opt.Data.(type) {
 			case string:
+				rc.SetHeader("Content-Type", "application/json")
 				rc.SetBody(b)
 			case []byte:
+				rc.SetHeader("Content-Type", "application/json")
 				rc.SetBody(b)
 			default:
+				rc.SetHeader("Content-Type", "application/json")
 				rc.SetBody(opt.Data)
 			}
 		}
