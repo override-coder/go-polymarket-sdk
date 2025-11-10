@@ -1,6 +1,7 @@
 package clob
 
 import (
+	"errors"
 	"fmt"
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	"github.com/override-coder/go-polymarket-sdk/signing"
@@ -53,6 +54,14 @@ func NewOrderBuilder(chaindId *big.Int, signFn signing.SignatureFunc) *OrderBuil
 		chaindId: chaindId,
 		signFn:   signFn,
 	}
+}
+
+func (o *OrderBuilder) WithSignatureFunc(signFn signing.SignatureFunc) error {
+	if o.signFn != nil {
+		return errors.New("signFn already set")
+	}
+	o.signFn = signFn
+	return nil
 }
 
 func (o *OrderBuilder) buildOrder(order types.UserOrder, options types.CreateOrderOptions) (*model.SignedOrder, error) {

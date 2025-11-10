@@ -48,7 +48,7 @@ func (c *Client) WithSignatureFunc(signFn signing.SignatureFunc) error {
 		return errors.New("signFn already set")
 	}
 	c.signFn = signFn
-	return nil
+	return c.orderBuilder.WithSignatureFunc(signFn)
 }
 
 func (c *Client) GetTickSize(tokenID string) (string, error) {
