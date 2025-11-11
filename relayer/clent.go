@@ -173,6 +173,7 @@ func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 }
 
 func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	start := time.Now()
 	from := option.SingerAddress
 	safeAddr, err := c.GetExpectedSafe(from)
 	if err != nil {
@@ -204,7 +205,7 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 		return nil, fmt.Errorf("execute: build safe transaction r	equest failed: %w", err)
 	}
 
-	fmt.Printf("Client side safe request creation took: %.3f seconds\n", time.Since(time.Now()).Seconds())
+	fmt.Printf("Client side safe request creation took: %.3f seconds\n", time.Since(start).Seconds())
 
 	payloadBytes, err := json.Marshal(reqBody)
 	if err != nil {
