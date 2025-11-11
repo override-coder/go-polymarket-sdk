@@ -39,7 +39,7 @@ func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderTyp
 		return nil, errors.WithMessage(err, "create order get negRisk")
 	}
 
-	signedOrder, err := c.orderBuilder.buildOrder(userOrder, types.CreateOrderOptions{
+	signedOrder, err := c.orderBuilder.buildOrder(userOrder, orderType, types.CreateOrderOptions{
 		AuthOption: option,
 		TickSize:   types.TickSize(tickSize),
 		NegRisk:    negRisk,

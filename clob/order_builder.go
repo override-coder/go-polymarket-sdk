@@ -64,12 +64,12 @@ func (o *OrderBuilder) WithSignatureFunc(signFn signing.SignatureFunc) error {
 	return nil
 }
 
-func (o *OrderBuilder) buildOrder(order types.UserOrder, options types.CreateOrderOptions) (*model.SignedOrder, error) {
-	return o.createOrder(order, options)
+func (o *OrderBuilder) buildOrder(order types.UserOrder, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrder, error) {
+	return o.createOrder(order, orderType, options)
 }
 
-func (o *OrderBuilder) createOrder(order types.UserOrder, options types.CreateOrderOptions) (*model.SignedOrder, error) {
-	orderData := o.buildOrderCreationArgs(order, roundingConfig[options.TickSize], options.AuthOption)
+func (o *OrderBuilder) createOrder(order types.UserOrder, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrder, error) {
+	orderData := o.buildOrderCreationArgs(order, orderType, roundingConfig[options.TickSize], options.AuthOption)
 	exchangeContract := model.CTFExchange
 	if options.NegRisk {
 		exchangeContract = model.NegRiskCTFExchange
@@ -97,9 +97,11 @@ func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingCon
 	}, nil
 }
 
-func (o *OrderBuilder) buildOrderCreationArgs(order types.UserOrder, roundConfig RoundConfig, option *sdktypes.AuthOption) *model.OrderData {
-
+func (o *OrderBuilder) buildOrderCreationArgs(order types.UserOrder, orderType types.OrderType, roundConfig RoundConfig, option *sdktypes.AuthOption) *model.OrderData {
 	side, makerAmt, takerAmt := getOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
+	if orderType == types.OrderTypeFAK || orderType == types.OrderTypeFOK {
+		side, makerAmt, takerAmt = getMarketOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
+	}
 	makerAmount := utils.Pow(utils.Float64ToDecimal(makerAmt), types.CollateralTokenDecimals)
 	takerAmount := utils.Pow(utils.Float64ToDecimal(takerAmt), types.ConditionalTokenDecimals)
 
@@ -156,6 +158,30 @@ func getOrderRawAmounts(side types.Side, size float64, price float64, roundConfi
 	}
 	rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
 	rawTakerAmt := rawMakerAmt * rawPrice
+	if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+		}
+	}
+	return model.SELL, rawMakerAmt, rawTakerAmt
+}
+
+func getMarketOrderRawAmounts(side types.Side, size float64, price float64, roundConfig RoundConfig) (model.Side, float64, float64) {
+	rawPrice := utils.RoundDown(price, roundConfig.Price)
+	if side == types.BUY {
+		rawMakerAmt := utils.RoundDown(rawPrice*size, roundConfig.Size)
+		rawTakerAmt := size
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+			}
+		}
+		return model.BUY, rawMakerAmt, rawTakerAmt
+	}
+	rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
+	rawTakerAmt := rawPrice * size
 	if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
 		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
 		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
