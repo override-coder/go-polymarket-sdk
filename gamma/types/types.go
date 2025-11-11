@@ -202,6 +202,8 @@ type Market struct {
 	LiquidityAmm   *decimal.Decimal `json:"liquidityAmm"`
 	LiquidityClob  *decimal.Decimal `json:"liquidityClob"`
 
+	Events []Event `json:"events"`
+
 	ClobRewards []ClobRewards `json:"clobRewards"`
 
 	MakerBaseFee         *int  `json:"makerBaseFee"`
