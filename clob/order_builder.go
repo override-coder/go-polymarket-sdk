@@ -170,8 +170,8 @@ func getOrderRawAmounts(side types.Side, size float64, price float64, roundConfi
 func getMarketOrderRawAmounts(side types.Side, size float64, price float64, roundConfig RoundConfig) (model.Side, float64, float64) {
 	rawPrice := utils.RoundDown(price, roundConfig.Price)
 	if side == types.BUY {
-		rawMakerAmt := utils.RoundDown(rawPrice*size, roundConfig.Size)
-		rawTakerAmt := size
+		rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
+		rawTakerAmt := rawMakerAmt / rawPrice
 		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
 			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
 			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
@@ -181,7 +181,7 @@ func getMarketOrderRawAmounts(side types.Side, size float64, price float64, roun
 		return model.BUY, rawMakerAmt, rawTakerAmt
 	}
 	rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
-	rawTakerAmt := rawPrice * size
+	rawTakerAmt := rawMakerAmt * rawPrice
 	if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
 		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
 		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {

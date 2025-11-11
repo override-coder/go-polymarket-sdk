@@ -85,7 +85,7 @@ type Order struct {
 type UserOrder struct {
 	TokenID    string   `json:"tokenID"`              // TokenID of the Conditional token asset being traded
 	Price      float64  `json:"price"`                // Price used to create the order
-	Size       float64  `json:"size"`                 // Size in terms of the ConditionalToken
+	Size       float64  `json:"size"`                 // Size in terms of the ConditionalToken in limit, 	// market BUY orders: $$$ Amount to buy // SELL orders: Shares to sell
 	Side       Side     `json:"side"`                 // Side of the order
 	FeeRateBps *float64 `json:"feeRateBps,omitempty"` // Fee rate, in basis points, charged to the order maker, charged on proceeds
 	Nonce      *int64   `json:"nonce,omitempty"`      // Nonce used for onchain cancellations
