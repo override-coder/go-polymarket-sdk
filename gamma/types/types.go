@@ -249,9 +249,9 @@ type Series struct {
 	UpdatedAt         *string            `json:"updatedAt"`
 	CommentsEnabled   *bool              `json:"commentsEnabled"`
 	Competitive       *decimal.Decimal   `json:"competitive"`
-	Volume24hr        *int               `json:"volume24hr"`
-	Volume            *int               `json:"volume"`
-	Liquidity         *int               `json:"liquidity"`
+	Volume24hr        *decimal.Decimal   `json:"volume24hr"`
+	Volume            *decimal.Decimal   `json:"volume"`
+	Liquidity         *decimal.Decimal   `json:"liquidity"`
 	StartDate         *string            `json:"startDate"`
 	PythTokenID       *string            `json:"pythTokenID"`
 	CgAssetName       *string            `json:"cgAssetName"`
