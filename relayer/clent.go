@@ -161,7 +161,11 @@ func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 
 	body := string(payloadBytes)
 
-	headers, err := sdkheaders.CreateL2BuilderHeaders(c.builderApiKeyCreds, clobtypes.L2HeaderArgs{Method: http.MethodPost, RequestPath: types.SUBMIT_TRANSACTION, Body: body}, nil)
+	builderApiKeyCreds := option.BuilderApiKeyCreds
+	if builderApiKeyCreds == nil {
+		builderApiKeyCreds = c.builderApiKeyCreds
+	}
+	headers, err := sdkheaders.CreateL2BuilderHeaders(builderApiKeyCreds, clobtypes.L2HeaderArgs{Method: http.MethodPost, RequestPath: types.SUBMIT_TRANSACTION, Body: body}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("deploy internal: create header failed: %w", err)
 	}
@@ -219,7 +223,11 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 
 	body := string(payloadBytes)
 
-	headers, err := sdkheaders.CreateL2BuilderHeaders(c.builderApiKeyCreds, clobtypes.L2HeaderArgs{Method: http.MethodPost, RequestPath: types.SUBMIT_TRANSACTION, Body: body}, nil)
+	builderApiKeyCreds := option.BuilderApiKeyCreds
+	if builderApiKeyCreds == nil {
+		builderApiKeyCreds = c.builderApiKeyCreds
+	}
+	headers, err := sdkheaders.CreateL2BuilderHeaders(builderApiKeyCreds, clobtypes.L2HeaderArgs{Method: http.MethodPost, RequestPath: types.SUBMIT_TRANSACTION, Body: body}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("deploy internal: create header failed: %w", err)
 	}

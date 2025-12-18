@@ -18,7 +18,8 @@ type AuthOption struct {
 	SingerAddress string              `json:"singer_address"`
 	FunderAddress string              `json:"funder_address"`
 
-	ApiKeyCreds *ApiKeyCreds `json:"api_key_creds"`
+	ApiKeyCreds        *ApiKeyCreds        `json:"api_key_creds"`
+	BuilderApiKeyCreds *BuilderApiKeyCreds `json:"builder_api_key_creds"`
 }
 
 // ApiKeyCreds API密钥凭证
