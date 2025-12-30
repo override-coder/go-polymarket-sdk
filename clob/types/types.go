@@ -184,3 +184,8 @@ type OpenOrders struct {
 	Limit      int         `json:"limit"`
 	Count      int         `json:"count"`
 }
+
+type PricesRequest struct {
+	TokenId string `json:"token_id"`
+	Side    string `json:"side"`
+}

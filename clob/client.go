@@ -141,3 +141,25 @@ func (c *Client) GetMarketPrice(tokenID, side string) (string, error) {
 	}
 	return resp["price"], nil
 }
+
+func (c *Client) GetMarketPrices(prices []types.PricesRequest) (map[string]string, error) {
+	var resp map[string]map[string]string
+	res, err := c.client.DoRequest(http.MethodPost, types.GET_PRICES, &http2.RequestOptions{
+		Data: prices,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrap(e, "get market price")
+	}
+	out := make(map[string]string, len(prices))
+	for _, id := range prices {
+		if sideMap, ok := resp[id.TokenId]; ok {
+			if price, found := sideMap["BUY"]; found {
+				out[id.TokenId] = price
+			}
+			if price, found := sideMap["SELL"]; found {
+				out[id.TokenId] = price
+			}
+		}
+	}
+	return out, nil
+}
