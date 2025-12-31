@@ -137,3 +137,55 @@ type PositionValue struct {
 	User  string  `json:"user"`
 	Value float64 `json:"value"`
 }
+
+type LeaderboardCategory string
+
+const (
+	LeaderboardCategoryOVERALL   LeaderboardCategory = "OVERALL"
+	LeaderboardCategoryPOLITICS  LeaderboardCategory = "POLITICS"
+	LeaderboardCategorySPORTS    LeaderboardCategory = "SPORTS"
+	LeaderboardCategoryCRYPTO    LeaderboardCategory = "CRYPTO"
+	LeaderboardCategoryCULTURE   LeaderboardCategory = "CULTURE"
+	LeaderboardCategoryMENTIONS  LeaderboardCategory = "MENTIONS"
+	LeaderboardCategoryWEATHER   LeaderboardCategory = "WEATHER"
+	LeaderboardCategoryECONOMICS LeaderboardCategory = "ECONOMICS"
+	LeaderboardCategoryTECH      LeaderboardCategory = "TECH"
+	LeaderboardCategoryFINANCE   LeaderboardCategory = "FINANCE"
+)
+
+type LeaderboardTimePeriod string
+
+const (
+	LeaderboardTimeDAY   LeaderboardTimePeriod = "DAY"
+	LeaderboardTimeWEEK  LeaderboardTimePeriod = "WEEK"
+	LeaderboardTimeMONTH LeaderboardTimePeriod = "MONTH"
+	LeaderboardTimeALL   LeaderboardTimePeriod = "ALL"
+)
+
+type LeaderboardOrderBy string
+
+const (
+	LeaderboardOrderByPNL LeaderboardOrderBy = "PNL"
+	LeaderboardOrderByVOL LeaderboardOrderBy = "VOL"
+)
+
+type TraderLeaderboardQuery struct {
+	Category   *LeaderboardCategory
+	TimePeriod *LeaderboardTimePeriod
+	OrderBy    *LeaderboardOrderBy
+	Limit      *int
+	Offset     *int
+	User       *string
+	UserName   *string
+}
+
+type TraderLeaderboard struct {
+	Rank          string  `json:"rank"`
+	ProxyWallet   string  `json:"proxyWallet"`
+	UserName      string  `json:"userName"`
+	XUsername     string  `json:"xUsername"`
+	VerifiedBadge bool    `json:"verifiedBadge"`
+	Vol           float64 `json:"vol"`
+	PnL           float64 `json:"pnl"`
+	ProfileImage  string  `json:"profileImage"`
+}
