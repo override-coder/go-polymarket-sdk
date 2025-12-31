@@ -222,3 +222,73 @@ func (c *Client) GetPositionValue(q types.PositionValueQuery) ([]types.PositionV
 	return out, nil
 
 }
+
+func (c *Client) GetTraderLeaderboardRankings(
+	q types.TraderLeaderboardQuery,
+) ([]types.TraderLeaderboard, error) {
+
+	category := types.LeaderboardCategoryOVERALL
+	if q.Category != nil {
+		category = *q.Category
+	}
+
+	timePeriod := types.LeaderboardTimeDAY
+	if q.TimePeriod != nil {
+		timePeriod = *q.TimePeriod
+	}
+
+	orderBy := types.LeaderboardOrderByPNL
+	if q.OrderBy != nil {
+		orderBy = *q.OrderBy
+	}
+
+	limit := 25
+	if q.Limit != nil {
+		if *q.Limit < 1 || *q.Limit > 50 {
+			return nil, fmt.Errorf("limit out of range (1..50)")
+		}
+		limit = *q.Limit
+	}
+
+	offset := 0
+	if q.Offset != nil {
+		if *q.Offset < 0 || *q.Offset > 1000 {
+			return nil, fmt.Errorf("offset out of range (0..1000)")
+		}
+		offset = *q.Offset
+	}
+
+	params := map[string]any{
+		"category":   string(category),
+		"timePeriod": string(timePeriod),
+		"orderBy":    string(orderBy),
+		"limit":      limit,
+		"offset":     offset,
+	}
+
+	if q.User != nil && strings.TrimSpace(*q.User) != "" {
+		re := regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
+		if !re.MatchString(*q.User) {
+			return nil, fmt.Errorf("invalid user address: %s", *q.User)
+		}
+		params["user"] = *q.User
+	}
+
+	if q.UserName != nil && strings.TrimSpace(*q.UserName) != "" {
+		params["userName"] = *q.UserName
+	}
+
+	var out []types.TraderLeaderboard
+	resp, err := c.client.DoRequest(
+		http.MethodGet,
+		types.GET_LEADERBOARD,
+		&http2.RequestOptions{Params: params},
+		&out,
+	)
+
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+
+	return out, nil
+}
