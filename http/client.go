@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
-	"github.com/pkg/errors"
 	"net/http"
 	"strings"
 	"time"
@@ -115,9 +114,42 @@ func ParseHTTPError(resp *resty.Response, err error) (any, error) {
 	if body == nil {
 		body = string(b)
 	}
+
+	errMsg := extractErrorMessage(body)
+	if errMsg == "" {
+		errMsg = string(b)
+	}
+
 	return map[string]any{
-		"status":      resp.StatusCode(),
-		"status_text": resp.Status(),
-		"error":       body,
-	}, errors.Errorf("http non-2xx: %s", body)
+			"status":      resp.StatusCode(),
+			"status_text": resp.Status(),
+			"error":       body,
+		}, &UpstreamServiceError{
+			Service:    "polymarket",
+			StatusCode: resp.StatusCode(),
+			Message:    errMsg,
+			Body:       body,
+		}
+}
+
+func extractErrorMessage(body any) string {
+	switch v := body.(type) {
+	case map[string]any:
+		if msg, ok := v["error"].(string); ok {
+			return msg
+		}
+		if msg, ok := v["message"].(string); ok {
+			return msg
+		}
+		if msg, ok := v["msg"].(string); ok {
+			return msg
+		}
+		b, _ := json.Marshal(v)
+		return string(b)
+	case string:
+		return v
+	default:
+		b, _ := json.Marshal(v)
+		return string(b)
+	}
 }
