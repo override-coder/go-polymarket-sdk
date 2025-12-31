@@ -214,6 +214,9 @@ type Market struct {
 	Score                *int  `json:"score"`
 
 	ImageOptimized *OptimizedImage `json:"imageOptimized"`
+
+	BestBid *decimal.Decimal `json:"bestBid"`
+	BestAsk *decimal.Decimal `json:"bestAsk"`
 }
 
 type ClobRewards struct {
