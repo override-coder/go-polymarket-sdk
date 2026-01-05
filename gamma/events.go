@@ -17,3 +17,14 @@ func (c *Client) GetEventsBySlug(slug string) (*types.Event, error) {
 	}
 	return &out, nil
 }
+
+func (c *Client) GetEventsByID(id uint64) (*types.Event, error) {
+	requestPath := fmt.Sprintf("%s%d", types.GET_EVENTS_ID, id)
+
+	var out types.Event
+	resp, err := c.client.DoRequest(http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return &out, nil
+}
