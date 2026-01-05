@@ -178,3 +178,141 @@ func (c *Client) GetOrders(req types.GetActiveOrdersRequest, option *sdktypes.Au
 	}
 	return &resp, nil
 }
+
+func (c *Client) CancelOrder(orderId string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	if orderId == "" {
+		return nil, errors.New("order id is empty")
+	}
+	requestPath := fmt.Sprintf("%s", types.CANCEL_ORDER)
+
+	ts := time.Now().Unix()
+
+	params := make(map[string]any, 1)
+	params["orderID"] = orderId
+
+	bodyBytes, err := json.Marshal(params)
+	if err != nil {
+		return nil, errors.WithMessage(err, "cancel order post order marshal")
+	}
+	bodyStr := string(bodyBytes)
+
+	l2HeaderArgs := types.L2HeaderArgs{
+		Method:      http.MethodDelete,
+		RequestPath: requestPath,
+		Body:        bodyStr,
+	}
+
+	l2Headers, err := sdkheaders.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create l2 headers")
+	}
+
+	var resp types.CancelOrder
+	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+		Headers: l2Headers,
+		Data:    bodyStr,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrapf(e, "cancel order buy id:%v", orderId)
+	}
+	return &resp, nil
+}
+
+func (c *Client) CancelOrders(orderId []string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	if len(orderId) == 0 {
+		return nil, errors.New("orderId is empty")
+	}
+	requestPath := fmt.Sprintf("%s", types.CANCEL_ORDERS)
+
+	ts := time.Now().Unix()
+
+	bodyBytes, err := json.Marshal(orderId)
+	if err != nil {
+		return nil, errors.WithMessage(err, "cancel order post order marshal")
+	}
+	bodyStr := string(bodyBytes)
+
+	l2HeaderArgs := types.L2HeaderArgs{
+		Method:      http.MethodDelete,
+		RequestPath: requestPath,
+		Body:        bodyStr,
+	}
+
+	l2Headers, err := sdkheaders.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create l2 headers")
+	}
+
+	var resp types.CancelOrder
+	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+		Headers: l2Headers,
+		Data:    bodyStr,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrapf(e, "cancel orders buy ids:%v", orderId)
+	}
+	return &resp, nil
+}
+
+func (c *Client) CancelOrderAll(option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	requestPath := fmt.Sprintf("%s", types.CANCEL_ALL)
+	ts := time.Now().Unix()
+	l2HeaderArgs := types.L2HeaderArgs{
+		Method:      http.MethodDelete,
+		RequestPath: requestPath,
+	}
+
+	l2Headers, err := sdkheaders.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create l2 headers")
+	}
+
+	var resp types.CancelOrder
+	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+		Headers: l2Headers,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrap(e, "cancel order all")
+	}
+	return &resp, nil
+}
+
+func (c *Client) CancelOrderByMarket(request *types.CancelOrderRequest, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	requestPath := fmt.Sprintf("%s", types.CANCEL_MARKET_ORDERS)
+	ts := time.Now().Unix()
+
+	params := make(map[string]any, 2)
+	if request.ConditionID != nil && *request.ConditionID != "" {
+		params["market"] = *request.ConditionID
+	}
+	if request.AssetID != nil && *request.AssetID != "" {
+		params["asset_id"] = *request.AssetID
+	}
+
+	bodyBytes, err := json.Marshal(params)
+	if err != nil {
+		return nil, errors.WithMessage(err, "cancel order post order marshal")
+	}
+	bodyStr := string(bodyBytes)
+
+	l2HeaderArgs := types.L2HeaderArgs{
+		Method:      http.MethodDelete,
+		RequestPath: requestPath,
+		Body:        bodyStr,
+	}
+
+	l2Headers, err := sdkheaders.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create l2 headers")
+	}
+
+	var resp types.CancelOrder
+	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+		Headers: l2Headers,
+		Data:    bodyStr,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrapf(e, "cancel order by market:%v", params)
+	}
+	return &resp, nil
+}

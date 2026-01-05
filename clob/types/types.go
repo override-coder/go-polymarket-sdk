@@ -189,3 +189,13 @@ type PricesRequest struct {
 	TokenId string `json:"token_id"`
 	Side    string `json:"side"`
 }
+
+type CancelOrderRequest struct {
+	ConditionID *string `json:"market"`
+	AssetID     *string `json:"asset_id"`
+}
+
+type CancelOrder struct {
+	Canceled    []string          `json:"canceled"`
+	NotCanceled map[string]string `json:"not_canceled"`
+}

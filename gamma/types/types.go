@@ -1,6 +1,9 @@
 package types
 
-import "github.com/shopspring/decimal"
+import (
+	"encoding/json"
+	"github.com/shopspring/decimal"
+)
 
 type Event struct {
 	ID                string           `json:"id"`
@@ -393,4 +396,33 @@ type Template struct {
 	ShowMarketImages *bool   `json:"showMarketImages"`
 	SeriesSlug       *string `json:"seriesSlug"`
 	Outcomes         *string `json:"outcomes"`
+}
+
+type SearchParams struct {
+	Q                 string   `json:"q"` // 必填
+	Cache             *bool    `json:"cache,omitempty"`
+	EventsStatus      *string  `json:"events_status,omitempty"`
+	LimitPerType      *int     `json:"limit_per_type,omitempty"`
+	Page              *int     `json:"page,omitempty"`
+	EventsTag         []string `json:"events_tag,omitempty"`
+	KeepClosedMarkets *int     `json:"keep_closed_markets,omitempty"`
+	Sort              *string  `json:"sort,omitempty"`
+	Ascending         *bool    `json:"ascending,omitempty"`
+	SearchTags        *bool    `json:"search_tags,omitempty"`
+	SearchProfiles    *bool    `json:"search_profiles,omitempty"`
+	Recurrence        *string  `json:"recurrence,omitempty"`
+	ExcludeTagID      []int    `json:"exclude_tag_id,omitempty"`
+	Optimized         *bool    `json:"optimized,omitempty"`
+}
+
+type SearchResponse struct {
+	Events     []*Event          `json:"events"`
+	Tags       json.RawMessage   `json:"tags"`
+	Profiles   json.RawMessage   `json:"profiles"`
+	Pagination *SearchPagination `json:"pagination"`
+}
+
+type SearchPagination struct {
+	HasMore      bool `json:"hasMore"`
+	TotalResults int  `json:"totalResults"`
 }
