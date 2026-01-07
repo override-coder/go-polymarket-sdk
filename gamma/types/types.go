@@ -426,3 +426,35 @@ type SearchPagination struct {
 	HasMore      bool `json:"hasMore"`
 	TotalResults int  `json:"totalResults"`
 }
+
+type GetMarketsParams struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+
+	Order     *string `json:"order,omitempty"`
+	Ascending *bool   `json:"ascending,omitempty"`
+
+	ID                []uint64 `json:"id"`
+	Slug              []string `json:"slug"`
+	CLOBTokenIDs      []string `json:"clob_token_ids"`
+	ConditionIDs      []string `json:"condition_ids"`
+	MarketMakerAddr   []string `json:"market_maker_address"`
+	LiquidityNumMin   *float64 `json:"liquidity_num_min,omitempty"`
+	LiquidityNumMax   *float64 `json:"liquidity_num_max,omitempty"`
+	VolumeNumMin      *float64 `json:"volume_num_min,omitempty"`
+	VolumeNumMax      *float64 `json:"volume_num_max,omitempty"`
+	StartDateMin      *string  `json:"start_date_min,omitempty"`
+	StartDateMax      *string  `json:"start_date_max,omitempty"`
+	EndDateMin        *string  `json:"end_date_min,omitempty"`
+	EndDateMax        *string  `json:"end_date_max,omitempty"`
+	TagID             *uint64  `json:"tag_id,omitempty"`
+	RelatedTags       *bool    `json:"related_tags,omitempty"`
+	CYOM              *bool    `json:"cyom,omitempty"`
+	UMAResolution     *string  `json:"uma_resolution_status,omitempty"`
+	GameID            *string  `json:"game_id,omitempty"`
+	SportsMarketTypes []string `json:"sports_market_types,omitempty"`
+	RewardsMinSize    *float64 `json:"rewards_min_size,omitempty"`
+	QuestionIDs       []string `json:"question_ids,omitempty"`
+	IncludeTag        *bool    `json:"include_tag,omitempty"`
+	Closed            *bool    `json:"closed,omitempty"`
+}
