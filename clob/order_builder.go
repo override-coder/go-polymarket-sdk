@@ -119,7 +119,7 @@ func (o *OrderBuilder) buildOrderCreationArgs(order types.UserOrder, orderType t
 		taker = *order.Taker
 	}
 	if order.FeeRateBps != nil && *order.FeeRateBps > 0 {
-		feeRateBps = fmt.Sprintf("%f", *order.FeeRateBps)
+		feeRateBps = utils.Float64ToDecimal(*order.FeeRateBps).String()
 	}
 	if order.Nonce != nil && *order.Nonce > 0 {
 		nonce = fmt.Sprintf("%d", *order.Nonce)
