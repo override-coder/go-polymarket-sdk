@@ -220,6 +220,8 @@ type Market struct {
 
 	BestBid *decimal.Decimal `json:"bestBid"`
 	BestAsk *decimal.Decimal `json:"bestAsk"`
+
+	Tags []Tag `json:"tags"`
 }
 
 type ClobRewards struct {
