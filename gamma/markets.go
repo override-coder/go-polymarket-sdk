@@ -53,16 +53,16 @@ func (c *Client) GetMarkets(p *types.GetMarketsParams) ([]*types.Market, error) 
 	}
 
 	if p.LiquidityNumMin != nil {
-		qs.Set("liquidity_num_min", strconv.FormatFloat(*p.LiquidityNumMin, 'f', -1, 64))
+		qs.Set("liquidity_num_min", p.LiquidityNumMin.String())
 	}
 	if p.LiquidityNumMax != nil {
-		qs.Set("liquidity_num_max", strconv.FormatFloat(*p.LiquidityNumMax, 'f', -1, 64))
+		qs.Set("liquidity_num_max", p.LiquidityNumMax.String())
 	}
 	if p.VolumeNumMin != nil {
-		qs.Set("volume_num_min", strconv.FormatFloat(*p.VolumeNumMin, 'f', -1, 64))
+		qs.Set("volume_num_min", p.VolumeNumMin.String())
 	}
 	if p.VolumeNumMax != nil {
-		qs.Set("volume_num_max", strconv.FormatFloat(*p.VolumeNumMax, 'f', -1, 64))
+		qs.Set("volume_num_max", p.VolumeNumMax.String())
 	}
 	if p.StartDateMin != nil && strings.TrimSpace(*p.StartDateMin) != "" {
 		qs.Set("start_date_min", strings.TrimSpace(*p.StartDateMin))
@@ -92,7 +92,7 @@ func (c *Client) GetMarkets(p *types.GetMarketsParams) ([]*types.Market, error) 
 		qs.Set("game_id", strings.TrimSpace(*p.GameID))
 	}
 	if p.RewardsMinSize != nil {
-		qs.Set("rewards_min_size", strconv.FormatFloat(*p.RewardsMinSize, 'f', -1, 64))
+		qs.Set("rewards_min_size", p.RewardsMinSize.String())
 	}
 	if p.IncludeTag != nil {
 		qs.Set("include_tag", strconv.FormatBool(*p.IncludeTag))
