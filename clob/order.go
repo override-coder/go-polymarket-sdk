@@ -30,9 +30,20 @@ func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderTyp
 	userOrder.FeeRateBps = &feeRateBps
 
 	tickSizeFloat64 := utils.StringToDecimal(tickSize).InexactFloat64()
-	if !utils.PriceValid(userOrder.Price, tickSizeFloat64) {
-		return nil, errors.Errorf("invalid price %f, min: %f - max: %f", userOrder.Price, tickSizeFloat64, 1-tickSizeFloat64)
+	//if !utils.PriceValid(userOrder.Price, tickSizeFloat64) {
+	//	return nil, errors.Errorf("invalid price %f, min: %f - max: %f", userOrder.Price, tickSizeFloat64, 1-tickSizeFloat64)
+	//}
+	normalizedPrice := utils.NormalizePrice(userOrder.Price, tickSizeFloat64)
+	if normalizedPrice != userOrder.Price {
+		fmt.Printf(
+			"price adjusted: origin=%f adjusted=%f (min=%f max=%f)",
+			userOrder.Price,
+			normalizedPrice,
+			tickSizeFloat64,
+			1-tickSizeFloat64,
+		)
 	}
+	userOrder.Price = normalizedPrice
 
 	negRisk, err := c.GetNegRisk(tokenID)
 	if err != nil {

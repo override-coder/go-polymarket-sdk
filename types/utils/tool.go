@@ -90,3 +90,18 @@ func PriceValid(price float64, tickSize float64) bool {
 	const epsilon = 1e-9
 	return price >= tickSize-epsilon && price <= 1.0-tickSize+epsilon
 }
+
+func NormalizePrice(price, tickSize float64) float64 {
+	const epsilon = 1e-9
+
+	minSize := tickSize
+	maxSize := 1.0 - tickSize
+
+	if price < minSize-epsilon {
+		return minSize
+	}
+	if price > maxSize+epsilon {
+		return maxSize
+	}
+	return price
+}
