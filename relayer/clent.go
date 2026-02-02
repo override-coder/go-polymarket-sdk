@@ -311,3 +311,83 @@ func (c *Client) PollUntilState(
 		}
 	}
 }
+
+func (c *Client) BuildTx(txns []types.SafeTransaction, metadata string, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	from := option.SingerAddress
+	safeAddr, err := c.GetExpectedSafe(from)
+	if err != nil {
+		return nil, fmt.Errorf("execute: GetExpectedSafe failed: %w", err)
+	}
+
+	deployed, err := c.GetDeployed(safeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("execute: GetDeployed failed: %w", err)
+	}
+	if !deployed.Deployed {
+		return nil, fmt.Errorf("execute: safe not deployed")
+	}
+
+	noncePayload, err := c.GetNonce(from, types.TransactionTypeSAFE)
+	if err != nil {
+		return nil, fmt.Errorf("execute: GetNonce failed: %w", err)
+	}
+
+	args := types.SafeTransactionArgs{
+		From:         from,
+		Nonce:        noncePayload.Nonce,
+		ChainID:      c.chainId.Int64(),
+		Transactions: txns,
+	}
+
+	reqBody, err := buildSafeTransactionRequest(c.signFn, args, c.contractConfig, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("execute: build safe transaction r	equest failed: %w", err)
+	}
+
+	return reqBody, nil
+}
+
+func (c *Client) ExecuteByTx(reqBody *types.TransactionRequest, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	start := time.Now()
+	from := option.SingerAddress
+	safeAddr, err := c.GetExpectedSafe(from)
+	if err != nil {
+		return nil, fmt.Errorf("execute: GetExpectedSafe failed: %w", err)
+	}
+
+	deployed, err := c.GetDeployed(safeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("execute: GetDeployed failed: %w", err)
+	}
+	if !deployed.Deployed {
+		return nil, fmt.Errorf("execute: safe not deployed")
+	}
+
+	fmt.Printf("Client side safe request creation took: %.3f seconds\n", time.Since(start).Seconds())
+
+	payloadBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("execute: marshal request failed: %w", err)
+	}
+
+	body := string(payloadBytes)
+
+	builderApiKeyCreds := option.BuilderApiKeyCreds
+	if builderApiKeyCreds == nil {
+		builderApiKeyCreds = c.builderApiKeyCreds
+	}
+	headers, err := sdkheaders.CreateL2BuilderHeaders(builderApiKeyCreds, clobtypes.L2HeaderArgs{Method: http.MethodPost, RequestPath: types.SUBMIT_TRANSACTION, Body: body}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("deploy internal: create header failed: %w", err)
+	}
+
+	var out types.RelayerTransactionResponse
+	resp, err := c.client.DoRequest(http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
+		Headers: headers,
+		Data:    body,
+	}, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return &out, nil
+}

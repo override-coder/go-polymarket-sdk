@@ -98,9 +98,15 @@ func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingCon
 }
 
 func (o *OrderBuilder) buildOrderCreationArgs(order types.UserOrder, orderType types.OrderType, roundConfig RoundConfig, option *sdktypes.AuthOption) *model.OrderData {
-	side, makerAmt, takerAmt := getOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
+	var (
+		side     model.Side
+		makerAmt float64
+		takerAmt float64
+	)
 	if orderType == types.OrderTypeFAK || orderType == types.OrderTypeFOK {
 		side, makerAmt, takerAmt = getMarketOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
+	} else {
+		side, makerAmt, takerAmt = getOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
 	}
 	makerAmount := utils.Pow(utils.Float64ToDecimal(makerAmt), types.CollateralTokenDecimals)
 	takerAmount := utils.Pow(utils.Float64ToDecimal(takerAmt), types.ConditionalTokenDecimals)
