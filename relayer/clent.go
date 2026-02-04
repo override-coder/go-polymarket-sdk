@@ -312,7 +312,7 @@ func (c *Client) PollUntilState(
 	}
 }
 
-func (c *Client) BuildTx(txns []types.SafeTransaction, metadata string, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadata string, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
 	from := option.SingerAddress
 	safeAddr, err := c.GetExpectedSafe(from)
 	if err != nil {
@@ -327,14 +327,18 @@ func (c *Client) BuildTx(txns []types.SafeTransaction, metadata string, option *
 		return nil, fmt.Errorf("execute: safe not deployed")
 	}
 
-	noncePayload, err := c.GetNonce(from, types.TransactionTypeSAFE)
-	if err != nil {
-		return nil, fmt.Errorf("execute: GetNonce failed: %w", err)
+	nonce := nonceAt.String()
+	if nonceAt.Cmp(big.NewInt(0)) == 0 {
+		noncePayload, err := c.GetNonce(from, types.TransactionTypeSAFE)
+		if err != nil {
+			return nil, fmt.Errorf("execute: GetNonce failed: %w", err)
+		}
+		nonce = noncePayload.Nonce
 	}
 
 	args := types.SafeTransactionArgs{
 		From:         from,
-		Nonce:        noncePayload.Nonce,
+		Nonce:        nonce,
 		ChainID:      c.chainId.Int64(),
 		Transactions: txns,
 	}
