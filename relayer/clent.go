@@ -312,6 +312,39 @@ func (c *Client) PollUntilState(
 	}
 }
 
+func (c *Client) BuildDeployTx(option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	safeAddr, err := c.GetExpectedSafe(option.SingerAddress)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "deploy getExpectedSafe signer:%v", option.SingerAddress)
+	}
+
+	deployed, err := c.GetDeployed(safeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("deploy: GetDeployed failed: %w", err)
+	}
+	if deployed.Deployed {
+		return nil, errors.Errorf("deploy: Deployed already deployed. signer:%s, safeAddr:%s", option.SingerAddress, safeAddr)
+	}
+
+	fmt.Printf("Deploying safe %s...\n", safeAddr)
+
+	from := option.SingerAddress
+	args := types.SafeCreateTransactionArgs{
+		From:            from,
+		ChainID:         c.chainId.Int64(),
+		PaymentToken:    sdktypes.ZeroAddress,
+		Payment:         "0",
+		PaymentReceiver: sdktypes.ZeroAddress,
+	}
+
+	reqBody, err := buildSafeCreateTransactionRequest(c.chainId, c.signFn, c.contractConfig.SafeFactory, args)
+	if err != nil {
+		return nil, fmt.Errorf("deployInternal: build request failed: %w", err)
+	}
+
+	return reqBody, nil
+}
+
 func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadata string, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
 	from := option.SingerAddress
 	safeAddr, err := c.GetExpectedSafe(from)
