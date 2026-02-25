@@ -2,11 +2,11 @@ package clob
 
 import (
 	"fmt"
-	"github.com/cockroachdb/errors"
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	"github.com/override-coder/go-polymarket-sdk/headers"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
+	"github.com/pkg/errors"
 	"math/big"
 	"net/http"
 	"time"
