@@ -199,3 +199,8 @@ type CancelOrder struct {
 	Canceled    []string          `json:"canceled"`
 	NotCanceled map[string]string `json:"not_canceled"`
 }
+
+type BalanceAllowanceResponse struct {
+	Balance   string `json:"balance"`
+	Allowance string `json:"allowance"`
+}
