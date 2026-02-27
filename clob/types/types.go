@@ -91,6 +91,8 @@ type UserOrder struct {
 	Nonce      *int64   `json:"nonce,omitempty"`      // Nonce used for onchain cancellations
 	Expiration *int64   `json:"expiration,omitempty"` // Timestamp after which the order is expired.
 	Taker      *string  `json:"taker,omitempty"`      // Address of the order taker. The zero address is used to indicate a public order
+	TickSize   *string  `json:"tickSize,omitempty"`   // Tick size of the order, default to 0.01
+	NegRisk    *bool    `json:"negRisk,omitempty"`    // Whether the order is a negative risk order, default to false
 }
 
 type CreateOrderOptions struct {

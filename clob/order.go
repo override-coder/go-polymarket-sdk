@@ -19,20 +19,30 @@ import (
 func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderType, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
 	tokenID := userOrder.TokenID
 
-	tickSize, err := c.GetTickSize(tokenID)
-	if err != nil {
-		return nil, errors.WithMessage(err, "create order get tickSize")
+	tickSize := ""
+	if userOrder.TickSize != nil {
+		tickSize = *userOrder.TickSize
+	} else {
+		tickSz, err := c.GetTickSize(tokenID)
+		if err != nil {
+			return nil, errors.WithMessage(err, "create order get tickSize")
+		}
+		tickSize = tickSz
 	}
-	feeRateBps, err := c.GetFeeRateBps(tokenID)
-	if err != nil {
-		return nil, errors.WithMessage(err, "create order get feeRateBps")
-	}
-	userOrder.FeeRateBps = &feeRateBps
 
+	feeRateBps := float64(0)
+	if userOrder.FeeRateBps != nil {
+		feeRateBps = *userOrder.FeeRateBps
+	} else {
+		bps, err := c.GetFeeRateBps(tokenID)
+		if err != nil {
+			return nil, errors.WithMessage(err, "create order get feeRateBps")
+		}
+		feeRateBps = bps
+	}
+
+	userOrder.FeeRateBps = &feeRateBps
 	tickSizeFloat64 := utils.StringToDecimal(tickSize).InexactFloat64()
-	//if !utils.PriceValid(userOrder.Price, tickSizeFloat64) {
-	//	return nil, errors.Errorf("invalid price %f, min: %f - max: %f", userOrder.Price, tickSizeFloat64, 1-tickSizeFloat64)
-	//}
 	normalizedPrice := utils.NormalizePrice(userOrder.Price, tickSizeFloat64)
 	if normalizedPrice != userOrder.Price {
 		fmt.Printf(
@@ -45,9 +55,15 @@ func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderTyp
 	}
 	userOrder.Price = normalizedPrice
 
-	negRisk, err := c.GetNegRisk(tokenID)
-	if err != nil {
-		return nil, errors.WithMessage(err, "create order get negRisk")
+	negRisk := false
+	if userOrder.NegRisk != nil {
+		negRisk = *userOrder.NegRisk
+	} else {
+		risk, err := c.GetNegRisk(tokenID)
+		if err != nil {
+			return nil, errors.WithMessage(err, "create order get negRisk")
+		}
+		negRisk = risk
 	}
 
 	signedOrder, err := c.orderBuilder.buildOrder(userOrder, orderType, types.CreateOrderOptions{
