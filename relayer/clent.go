@@ -55,7 +55,7 @@ func (c *Client) WithBuilderApiKeyCreds(newBuilder *sdktypes.BuilderApiKeyCreds)
 
 func (c *Client) GetNonce(signerAddress string, signerType types.TransactionType) (types.NoncePayload, error) {
 	var resp types.NoncePayload
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_NONCE, &http2.RequestOptions{
+	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_NONCE, &http2.RequestOptions{
 		Params: map[string]any{
 			"address": signerAddress,
 			"type":    signerType},
@@ -70,7 +70,7 @@ func (c *Client) GetNonce(signerAddress string, signerType types.TransactionType
 func (c *Client) GetTransaction(transactionID string) ([]types.RelayerTransaction, error) {
 	var resp []types.RelayerTransaction
 
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_TRANSACTION, &http2.RequestOptions{
+	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_TRANSACTION, &http2.RequestOptions{
 		Params: map[string]any{
 			"id": transactionID},
 	}, &resp)
@@ -96,7 +96,7 @@ func (c *Client) GetTransactions() ([]types.RelayerTransaction, error) {
 		}
 	}
 	var resp []types.RelayerTransaction
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_TRANSACTIONS, requestOptions, &resp)
+	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_TRANSACTIONS, requestOptions, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
 		return nil, e
 	}
@@ -171,7 +171,7 @@ func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 	}
 
 	var out types.RelayerTransactionResponse
-	resp, err := c.client.DoRequest(http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(context.Background(), http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
 		Headers: headers,
 		Data:    body,
 	}, &out)
@@ -233,7 +233,7 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 	}
 
 	var out types.RelayerTransactionResponse
-	resp, err := c.client.DoRequest(http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(context.Background(), http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
 		Headers: headers,
 		Data:    body,
 	}, &out)
@@ -245,7 +245,7 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 
 func (c *Client) GetDeployed(safeAddr string) (types.GetDeployedResponse, error) {
 	var resp types.GetDeployedResponse
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_DEPLOYED, &http2.RequestOptions{
+	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_DEPLOYED, &http2.RequestOptions{
 		Params: map[string]any{
 			"address": safeAddr},
 	}, &resp)
@@ -419,7 +419,7 @@ func (c *Client) ExecuteByTx(reqBody *types.TransactionRequest, option *sdktypes
 	}
 
 	var out types.RelayerTransactionResponse
-	resp, err := c.client.DoRequest(http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(context.Background(), http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
 		Headers: headers,
 		Data:    body,
 	}, &out)

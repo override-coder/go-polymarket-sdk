@@ -45,8 +45,8 @@ func (c *Client) newRequest(ctx context.Context) *resty.Request {
 	return r
 }
 
-func (c *Client) DoRequest(method, endpoint string, opt *RequestOptions, out any) (*resty.Response, error) {
-	rc := c.newRequest(context.Background())
+func (c *Client) DoRequest(ctx context.Context, method, endpoint string, opt *RequestOptions, out any) (*resty.Response, error) {
+	rc := c.newRequest(ctx)
 	if opt != nil {
 		if opt.Headers != nil {
 			for k, v := range opt.Headers {

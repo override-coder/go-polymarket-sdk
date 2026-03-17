@@ -1,6 +1,7 @@
 package dataapi
 
 import (
+	"context"
 	"fmt"
 	"github.com/override-coder/go-polymarket-sdk/dataapi/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
@@ -26,7 +27,7 @@ func NewClient(host string, chainId *big.Int) *Client {
 	}
 }
 
-func (c *Client) GetPositions(q types.PositionsQuery) ([]types.Position, error) {
+func (c *Client) GetPositions(ctx context.Context, q types.PositionsQuery) ([]types.Position, error) {
 	if strings.TrimSpace(q.User) == "" {
 		return nil, fmt.Errorf("user is required")
 	}
@@ -102,7 +103,7 @@ func (c *Client) GetPositions(q types.PositionsQuery) ([]types.Position, error) 
 	}
 
 	var out []types.Position
-	resp, err := c.client.DoRequest(http.MethodGet, types.GET_POSITIONS, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_POSITIONS, &http2.RequestOptions{
 		Params: params,
 	}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
@@ -111,7 +112,7 @@ func (c *Client) GetPositions(q types.PositionsQuery) ([]types.Position, error) 
 	return out, nil
 }
 
-func (c *Client) GetUserActivity(q types.ActivityQuery) ([]types.UserActivity, error) {
+func (c *Client) GetUserActivity(ctx context.Context, q types.ActivityQuery) ([]types.UserActivity, error) {
 	if strings.TrimSpace(q.User) == "" {
 		return nil, fmt.Errorf("user is required")
 	}
@@ -192,7 +193,7 @@ func (c *Client) GetUserActivity(q types.ActivityQuery) ([]types.UserActivity, e
 	}
 
 	var out []types.UserActivity
-	resp, err := c.client.DoRequest(http.MethodGet, types.GET_Activity, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_Activity, &http2.RequestOptions{
 		Params: params,
 	}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
@@ -201,7 +202,7 @@ func (c *Client) GetUserActivity(q types.ActivityQuery) ([]types.UserActivity, e
 	return out, nil
 }
 
-func (c *Client) GetPositionValue(q types.PositionValueQuery) ([]types.PositionValue, error) {
+func (c *Client) GetPositionValue(ctx context.Context, q types.PositionValueQuery) ([]types.PositionValue, error) {
 	if strings.TrimSpace(q.User) == "" {
 		return nil, fmt.Errorf("user is required")
 	}
@@ -213,7 +214,7 @@ func (c *Client) GetPositionValue(q types.PositionValueQuery) ([]types.PositionV
 	}
 
 	var out []types.PositionValue
-	resp, err := c.client.DoRequest(http.MethodGet, types.GET_VALUE, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_VALUE, &http2.RequestOptions{
 		Params: params,
 	}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
@@ -224,6 +225,7 @@ func (c *Client) GetPositionValue(q types.PositionValueQuery) ([]types.PositionV
 }
 
 func (c *Client) GetTraderLeaderboardRankings(
+	ctx context.Context,
 	q types.TraderLeaderboardQuery,
 ) ([]types.TraderLeaderboard, error) {
 
@@ -280,6 +282,7 @@ func (c *Client) GetTraderLeaderboardRankings(
 
 	var out []types.TraderLeaderboard
 	resp, err := c.client.DoRequest(
+		ctx,
 		http.MethodGet,
 		types.GET_LEADERBOARD,
 		&http2.RequestOptions{Params: params},

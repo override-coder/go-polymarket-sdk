@@ -1,28 +1,29 @@
 package gamma
 
 import (
+	"context"
 	"fmt"
 	"github.com/override-coder/go-polymarket-sdk/gamma/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	"net/http"
 )
 
-func (c *Client) GetEventsBySlug(slug string) (*types.Event, error) {
+func (c *Client) GetEventsBySlug(ctx context.Context, slug string) (*types.Event, error) {
 	requestPath := fmt.Sprintf("%s%s", types.GET_EVENTS_SLUG, slug)
 
 	var out types.Event
-	resp, err := c.client.DoRequest(http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
 	return &out, nil
 }
 
-func (c *Client) GetEventsByID(id uint64) (*types.Event, error) {
+func (c *Client) GetEventsByID(ctx context.Context, id uint64) (*types.Event, error) {
 	requestPath := fmt.Sprintf("%s%d", types.GET_EVENTS_ID, id)
 
 	var out types.Event
-	resp, err := c.client.DoRequest(http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}

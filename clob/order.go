@@ -1,6 +1,7 @@
 package clob
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,14 +17,14 @@ import (
 	"time"
 )
 
-func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderType, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
+func (c *Client) CreateOrder(ctx context.Context, userOrder types.UserOrder, orderType types.OrderType, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
 	tokenID := userOrder.TokenID
 
 	tickSize := ""
 	if userOrder.TickSize != nil {
 		tickSize = *userOrder.TickSize
 	} else {
-		tickSz, err := c.GetTickSize(tokenID)
+		tickSz, err := c.GetTickSize(ctx, tokenID)
 		if err != nil {
 			return nil, errors.WithMessage(err, "create order get tickSize")
 		}
@@ -34,7 +35,7 @@ func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderTyp
 	if userOrder.FeeRateBps != nil {
 		feeRateBps = *userOrder.FeeRateBps
 	} else {
-		bps, err := c.GetFeeRateBps(tokenID)
+		bps, err := c.GetFeeRateBps(ctx, tokenID)
 		if err != nil {
 			return nil, errors.WithMessage(err, "create order get feeRateBps")
 		}
@@ -59,7 +60,7 @@ func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderTyp
 	if userOrder.NegRisk != nil {
 		negRisk = *userOrder.NegRisk
 	} else {
-		risk, err := c.GetNegRisk(tokenID)
+		risk, err := c.GetNegRisk(ctx, tokenID)
 		if err != nil {
 			return nil, errors.WithMessage(err, "create order get negRisk")
 		}
@@ -75,10 +76,10 @@ func (c *Client) CreateOrder(userOrder types.UserOrder, orderType types.OrderTyp
 		return nil, errors.WithMessage(err, "create order buildOrder")
 	}
 
-	return c.postOrder(signedOrder, orderType, deferExec, option)
+	return c.postOrder(ctx, signedOrder, orderType, deferExec, option)
 }
 
-func (c *Client) postOrder(order *model.SignedOrder, orderType types.OrderType, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
+func (c *Client) postOrder(ctx context.Context, order *model.SignedOrder, orderType types.OrderType, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
 	orderPayload := orderToJson(order, option.ApiKeyCreds.ApiKey, &orderType, deferExec)
 	bodyBytes, err := json.Marshal(orderPayload)
 	if err != nil {
@@ -106,7 +107,7 @@ func (c *Client) postOrder(order *model.SignedOrder, orderType types.OrderType, 
 	}
 
 	var out types.OrderResponse
-	resp, err := c.client.DoRequest(http.MethodPost, types.POST_ORDER, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(ctx, http.MethodPost, types.POST_ORDER, &http2.RequestOptions{
 		Headers: headers,
 		Data:    bodyStr,
 	}, &out)
@@ -143,7 +144,7 @@ func orderToJson(order *model.SignedOrder, owner string, orderType *types.OrderT
 	}
 }
 
-func (c *Client) GetOrder(orderId string, req types.GetOrderRequest, option *sdktypes.AuthOption) (*types.OpenOrder, error) {
+func (c *Client) GetOrder(ctx context.Context, orderId string, req types.GetOrderRequest, option *sdktypes.AuthOption) (*types.OpenOrder, error) {
 	requestPath := fmt.Sprintf("%s%s", types.GET_ORDER, orderId)
 
 	ts := time.Now().Unix()
@@ -163,7 +164,7 @@ func (c *Client) GetOrder(orderId string, req types.GetOrderRequest, option *sdk
 	}
 
 	var resp types.OpenOrder
-	res, err := c.client.DoRequest(http.MethodGet, requestPath, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{
 		Headers: l2Headers,
 		Params:  params,
 	}, &resp)
@@ -173,7 +174,7 @@ func (c *Client) GetOrder(orderId string, req types.GetOrderRequest, option *sdk
 	return &resp, nil
 }
 
-func (c *Client) GetOrders(req types.GetActiveOrdersRequest, option *sdktypes.AuthOption) (*types.OpenOrders, error) {
+func (c *Client) GetOrders(ctx context.Context, req types.GetActiveOrdersRequest, option *sdktypes.AuthOption) (*types.OpenOrders, error) {
 	ts := time.Now().Unix()
 	l2HeaderArgs := types.L2HeaderArgs{
 		Method:      http.MethodGet,
@@ -196,7 +197,7 @@ func (c *Client) GetOrders(req types.GetActiveOrdersRequest, option *sdktypes.Au
 	}
 
 	var resp types.OpenOrders
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_OPEN_ORDERS, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_OPEN_ORDERS, &http2.RequestOptions{
 		Headers: l2Headers,
 		Params:  params,
 	}, &resp)
@@ -206,7 +207,7 @@ func (c *Client) GetOrders(req types.GetActiveOrdersRequest, option *sdktypes.Au
 	return &resp, nil
 }
 
-func (c *Client) CancelOrder(orderId string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+func (c *Client) CancelOrder(ctx context.Context, orderId string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
 	if orderId == "" {
 		return nil, errors.New("order id is empty")
 	}
@@ -235,7 +236,7 @@ func (c *Client) CancelOrder(orderId string, option *sdktypes.AuthOption) (*type
 	}
 
 	var resp types.CancelOrder
-	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodDelete, requestPath, &http2.RequestOptions{
 		Headers: l2Headers,
 		Data:    bodyStr,
 	}, &resp)
@@ -245,7 +246,7 @@ func (c *Client) CancelOrder(orderId string, option *sdktypes.AuthOption) (*type
 	return &resp, nil
 }
 
-func (c *Client) CancelOrders(orderId []string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+func (c *Client) CancelOrders(ctx context.Context, orderId []string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
 	if len(orderId) == 0 {
 		return nil, errors.New("orderId is empty")
 	}
@@ -271,7 +272,7 @@ func (c *Client) CancelOrders(orderId []string, option *sdktypes.AuthOption) (*t
 	}
 
 	var resp types.CancelOrder
-	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodDelete, requestPath, &http2.RequestOptions{
 		Headers: l2Headers,
 		Data:    bodyStr,
 	}, &resp)
@@ -281,7 +282,7 @@ func (c *Client) CancelOrders(orderId []string, option *sdktypes.AuthOption) (*t
 	return &resp, nil
 }
 
-func (c *Client) CancelOrderAll(option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+func (c *Client) CancelOrderAll(ctx context.Context, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
 	requestPath := fmt.Sprintf("%s", types.CANCEL_ALL)
 	ts := time.Now().Unix()
 	l2HeaderArgs := types.L2HeaderArgs{
@@ -295,7 +296,7 @@ func (c *Client) CancelOrderAll(option *sdktypes.AuthOption) (*types.CancelOrder
 	}
 
 	var resp types.CancelOrder
-	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodDelete, requestPath, &http2.RequestOptions{
 		Headers: l2Headers,
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
@@ -304,7 +305,7 @@ func (c *Client) CancelOrderAll(option *sdktypes.AuthOption) (*types.CancelOrder
 	return &resp, nil
 }
 
-func (c *Client) CancelOrderByMarket(request *types.CancelOrderRequest, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+func (c *Client) CancelOrderByMarket(ctx context.Context, request *types.CancelOrderRequest, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
 	requestPath := fmt.Sprintf("%s", types.CANCEL_MARKET_ORDERS)
 	ts := time.Now().Unix()
 
@@ -334,7 +335,7 @@ func (c *Client) CancelOrderByMarket(request *types.CancelOrderRequest, option *
 	}
 
 	var resp types.CancelOrder
-	res, err := c.client.DoRequest(http.MethodDelete, requestPath, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodDelete, requestPath, &http2.RequestOptions{
 		Headers: l2Headers,
 		Data:    bodyStr,
 	}, &resp)

@@ -1,6 +1,7 @@
 package clob
 
 import (
+	"context"
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	"github.com/override-coder/go-polymarket-sdk/signing"
@@ -51,12 +52,12 @@ func (c *Client) WithSignatureFunc(signFn signing.SignatureFunc) error {
 	return c.orderBuilder.WithSignatureFunc(signFn)
 }
 
-func (c *Client) GetTickSize(tokenID string) (string, error) {
+func (c *Client) GetTickSize(ctx context.Context, tokenID string) (string, error) {
 	if size, ok := c.tickSizes[tokenID]; ok {
 		return string(size), nil
 	}
 	var resp map[string]float64
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_TICK_SIZE, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_TICK_SIZE, &http2.RequestOptions{
 		Params: map[string]any{"token_id": tokenID},
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
@@ -73,13 +74,13 @@ func (c *Client) GetTickSize(tokenID string) (string, error) {
 }
 
 // GetNegRisk
-func (c *Client) GetNegRisk(tokenID string) (bool, error) {
+func (c *Client) GetNegRisk(ctx context.Context, tokenID string) (bool, error) {
 	if neg, ok := c.negRisk[tokenID]; ok {
 		return neg, nil
 	}
 
 	var resp map[string]bool
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_NEG_RISK, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_NEG_RISK, &http2.RequestOptions{
 		Params: map[string]any{"token_id": tokenID},
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
@@ -97,13 +98,13 @@ func (c *Client) GetNegRisk(tokenID string) (bool, error) {
 }
 
 // GetFeeRateBps
-func (c *Client) GetFeeRateBps(tokenID string) (float64, error) {
+func (c *Client) GetFeeRateBps(ctx context.Context, tokenID string) (float64, error) {
 	if fee, ok := c.feeRates[tokenID]; ok {
 		return fee, nil
 	}
 
 	var resp map[string]float64
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_FEE_RATE, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_FEE_RATE, &http2.RequestOptions{
 		Params: map[string]any{"token_id": tokenID},
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
@@ -122,7 +123,7 @@ func (c *Client) GetFeeRateBps(tokenID string) (float64, error) {
 
 func (c *Client) GetOrderBook(tokenID string) (*types.OrderBookSummary, error) {
 	var resp types.OrderBookSummary
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_ORDER_BOOK, &http2.RequestOptions{
+	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_ORDER_BOOK, &http2.RequestOptions{
 		Params: map[string]any{"token_id": tokenID},
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
@@ -131,9 +132,9 @@ func (c *Client) GetOrderBook(tokenID string) (*types.OrderBookSummary, error) {
 	return &resp, nil
 }
 
-func (c *Client) GetMarketPrice(tokenID, side string) (string, error) {
+func (c *Client) GetMarketPrice(ctx context.Context, tokenID, side string) (string, error) {
 	var resp map[string]string
-	res, err := c.client.DoRequest(http.MethodGet, types.GET_PRICE, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_PRICE, &http2.RequestOptions{
 		Params: map[string]any{"token_id": tokenID, "side": side},
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
@@ -142,9 +143,9 @@ func (c *Client) GetMarketPrice(tokenID, side string) (string, error) {
 	return resp["price"], nil
 }
 
-func (c *Client) GetMarketPrices(prices []types.PricesRequest) (map[string]string, error) {
+func (c *Client) GetMarketPrices(ctx context.Context, prices []types.PricesRequest) (map[string]string, error) {
 	var resp map[string]map[string]string
-	res, err := c.client.DoRequest(http.MethodPost, types.GET_PRICES, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodPost, types.GET_PRICES, &http2.RequestOptions{
 		Data: prices,
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {

@@ -1,6 +1,7 @@
 package gamma
 
 import (
+	"context"
 	"fmt"
 	"github.com/override-coder/go-polymarket-sdk/gamma/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
@@ -27,7 +28,7 @@ func NewClient(host string, chainId *big.Int) *Client {
 	}
 }
 
-func (c *Client) Search(p *types.SearchParams) (*types.SearchResponse, error) {
+func (c *Client) Search(ctx context.Context, p *types.SearchParams) (*types.SearchResponse, error) {
 	if p == nil {
 		return nil, fmt.Errorf("search params is nil")
 	}
@@ -90,7 +91,7 @@ func (c *Client) Search(p *types.SearchParams) (*types.SearchResponse, error) {
 	u.RawQuery = qs.Encode()
 
 	var out types.SearchResponse
-	resp, err := c.client.DoRequest(http.MethodGet, u.String(), &http2.RequestOptions{}, &out)
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, u.String(), &http2.RequestOptions{}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}

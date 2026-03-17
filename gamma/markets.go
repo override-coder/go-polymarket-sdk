@@ -1,6 +1,7 @@
 package gamma
 
 import (
+	"context"
 	"fmt"
 	"github.com/override-coder/go-polymarket-sdk/gamma/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
@@ -10,29 +11,29 @@ import (
 	"strings"
 )
 
-func (c *Client) GetMarketsBySlug(slug string) (*types.Market, error) {
+func (c *Client) GetMarketsBySlug(ctx context.Context, slug string) (*types.Market, error) {
 	requestPath := fmt.Sprintf("%s%s", types.GET_MARKETS_SLUG, slug)
 
 	var out types.Market
-	resp, err := c.client.DoRequest(http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
 	return &out, nil
 }
 
-func (c *Client) GetMarketsByID(id uint64) (*types.Market, error) {
+func (c *Client) GetMarketsByID(ctx context.Context, id uint64) (*types.Market, error) {
 	requestPath := fmt.Sprintf("%s%d", types.GET_MARKETS_ID, id)
 
 	var out types.Market
-	resp, err := c.client.DoRequest(http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
 	return &out, nil
 }
 
-func (c *Client) GetMarkets(p *types.GetMarketsParams) ([]*types.Market, error) {
+func (c *Client) GetMarkets(ctx context.Context, p *types.GetMarketsParams) ([]*types.Market, error) {
 	if p == nil {
 		return nil, fmt.Errorf("get markets params is nil")
 	}
@@ -144,7 +145,7 @@ func (c *Client) GetMarkets(p *types.GetMarketsParams) ([]*types.Market, error) 
 	u.RawQuery = qs.Encode()
 
 	var out []*types.Market
-	resp, err := c.client.DoRequest(http.MethodGet, u.String(), &http2.RequestOptions{}, &out)
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, u.String(), &http2.RequestOptions{}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
