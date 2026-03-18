@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"github.com/shopspring/decimal"
+	"time"
 )
 
 type Event struct {
@@ -466,7 +467,7 @@ type PublicProfileParams struct {
 }
 
 type PublicProfileResponse struct {
-	CreatedAt             *string             `json:"createdAt"`
+	CreatedAt             *time.Time          `json:"createdAt"`
 	ProxyWallet           *string             `json:"proxyWallet"`
 	ProfileImage          *string             `json:"profileImage"`
 	DisplayUsernamePublic *bool               `json:"displayUsernamePublic"`
@@ -479,9 +480,5 @@ type PublicProfileResponse struct {
 }
 
 type PublicProfileUser struct {
-	ID          *string `json:"id,omitempty"`
-	Address     *string `json:"address,omitempty"`
-	ProxyWallet *string `json:"proxyWallet,omitempty"`
-	Username    *string `json:"username,omitempty"`
-	Name        *string `json:"name,omitempty"`
+	ID *string `json:"id,omitempty"`
 }
