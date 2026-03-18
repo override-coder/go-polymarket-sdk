@@ -460,3 +460,28 @@ type GetMarketsParams struct {
 	IncludeTag        *bool            `json:"include_tag,omitempty"`
 	Closed            *bool            `json:"closed,omitempty"`
 }
+
+type PublicProfileParams struct {
+	Address string `json:"address"`
+}
+
+type PublicProfileResponse struct {
+	CreatedAt             *string             `json:"createdAt"`
+	ProxyWallet           *string             `json:"proxyWallet"`
+	ProfileImage          *string             `json:"profileImage"`
+	DisplayUsernamePublic *bool               `json:"displayUsernamePublic"`
+	Bio                   *string             `json:"bio"`
+	Pseudonym             *string             `json:"pseudonym"`
+	Name                  *string             `json:"name"`
+	Users                 []PublicProfileUser `json:"users"`
+	XUsername             *string             `json:"xUsername"`
+	VerifiedBadge         *bool               `json:"verifiedBadge"`
+}
+
+type PublicProfileUser struct {
+	ID          *string `json:"id,omitempty"`
+	Address     *string `json:"address,omitempty"`
+	ProxyWallet *string `json:"proxyWallet,omitempty"`
+	Username    *string `json:"username,omitempty"`
+	Name        *string `json:"name,omitempty"`
+}

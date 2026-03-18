@@ -98,3 +98,27 @@ func (c *Client) Search(ctx context.Context, p *types.SearchParams) (*types.Sear
 
 	return &out, nil
 }
+
+func (c *Client) GetPublicProfileByWalletAddress(ctx context.Context, p *types.PublicProfileParams) (*types.PublicProfileResponse, error) {
+	if p == nil {
+		return nil, fmt.Errorf("public profile params is nil")
+	}
+
+	address := strings.TrimSpace(p.Address)
+	if address == "" {
+		return nil, fmt.Errorf("address is required")
+	}
+
+	u := url.URL{Path: types.GET_PUBLIC_PROFILE_BY_WALLET_ADDRESS}
+	qs := url.Values{}
+	qs.Set("address", address)
+	u.RawQuery = qs.Encode()
+
+	var out types.PublicProfileResponse
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, u.String(), &http2.RequestOptions{}, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+
+	return &out, nil
+}
