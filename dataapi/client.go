@@ -130,15 +130,15 @@ func (c *Client) GetUserActivity(ctx context.Context, q types.ActivityQuery) ([]
 	}
 	limit := 100
 	if q.Limit != nil {
-		if *q.Limit < 0 || *q.Limit > 500 {
+		if *q.Limit < 0 {
 			return nil, fmt.Errorf("limit out of range (0..500)")
 		}
 		limit = *q.Limit
 	}
 	offset := 0
 	if q.Offset != nil {
-		if *q.Offset < 0 || *q.Offset > 10000 {
-			return nil, fmt.Errorf("offset out of range (0..10000)")
+		if *q.Offset < 0 || *q.Offset > 3000 {
+			return nil, fmt.Errorf("offset out of range (0..3000)")
 		}
 		offset = *q.Offset
 	}
