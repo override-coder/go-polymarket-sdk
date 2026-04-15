@@ -2,8 +2,9 @@ package types
 
 import (
 	"encoding/json"
-	"github.com/shopspring/decimal"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type Event struct {
@@ -481,4 +482,33 @@ type PublicProfileResponse struct {
 
 type PublicProfileUser struct {
 	ID *string `json:"id,omitempty"`
+}
+
+type GetEventsKeysetParams struct {
+	Active       *bool    `json:"active,omitempty"`
+	Closed       *bool    `json:"closed,omitempty"`
+	TagSlug      *string  `json:"tag_slug,omitempty"`
+	TitleSearch  *string  `json:"title_search,omitempty"`
+	Limit        *int     `json:"limit,omitempty"`
+	Ascending    *bool    `json:"ascending,omitempty"`
+	Live         *bool    `json:"live,omitempty"`
+	AfterCursor  *string  `json:"after_cursor,omitempty"`
+	Order        *string  `json:"order,omitempty"`
+	EventWeek    *int     `json:"event_week,omitempty"`
+	EventDate    *string  `json:"event_date,omitempty"`
+	TagMatch     *string  `json:"tag_match,omitempty"`
+	ExcludeTagID []uint64 `json:"exclude_tag_id,omitempty"`
+	TagID        []uint64 `json:"tag_id,omitempty"`
+	StartTimeMax *string  `json:"start_time_max,omitempty"`
+	StartTimeMin *string  `json:"start_time_min,omitempty"`
+	EndDateMax   *string  `json:"end_date_max,omitempty"`
+	EndDateMin   *string  `json:"end_date_min,omitempty"`
+	StartDateMax *string  `json:"start_date_max,omitempty"`
+	StartDateMin *string  `json:"start_date_min,omitempty"`
+	VolumeMax    *float64 `json:"volume_max,omitempty"`
+	VolumeMin    *float64 `json:"volume_min,omitempty"`
+	LiquidityMax *float64 `json:"liquidity_max,omitempty"`
+	LiquidityMin *float64 `json:"liquidity_min,omitempty"`
+	ID           []uint64 `json:"id,omitempty"`
+	Slug         []string `json:"slug,omitempty"`
 }

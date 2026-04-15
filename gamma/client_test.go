@@ -15,7 +15,7 @@ var (
 func TestGetPositions(t *testing.T) {
 	client := gamma.NewClient(PolymarketGammaURL, chaindId)
 
-	positions, err := client.GetMarketsBySlug("us-x-venezuela-military-engagement-by-september-30-659")
+	positions, err := client.GetMarketsBySlug(nil, "us-x-venezuela-military-engagement-by-september-30-659")
 	assert.Equal(t, nil, err)
 	t.Logf("positions: %v", positions)
 
