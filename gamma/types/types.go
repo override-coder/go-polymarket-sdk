@@ -514,6 +514,6 @@ type GetEventsKeysetParams struct {
 }
 
 type GetEventsKeysetResponse struct {
-	Events     []*Event `json:"events"`
-	NextCursor *string  `json:"next_cursor"`
+	Events     []Event `json:"events"`
+	NextCursor *string `json:"next_cursor"`
 }
