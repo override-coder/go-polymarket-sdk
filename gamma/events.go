@@ -34,7 +34,7 @@ func (c *Client) GetEventsByID(ctx context.Context, id uint64) (*types.Event, er
 	return &out, nil
 }
 
-func (c *Client) GetEventsByKeyset(ctx context.Context, params *types.GetEventsKeysetParams) ([]types.Event, error) {
+func (c *Client) GetEventsByKeyset(ctx context.Context, params *types.GetEventsKeysetParams) (*types.GetEventsKeysetResponse, error) {
 	u := url.URL{Path: types.GET_EVENTS_KEYSET}
 	qs := url.Values{}
 
@@ -129,10 +129,10 @@ func (c *Client) GetEventsByKeyset(ctx context.Context, params *types.GetEventsK
 
 	u.RawQuery = qs.Encode()
 
-	var out []types.Event
+	var out types.GetEventsKeysetResponse
 	resp, err := c.client.DoRequest(ctx, http.MethodGet, u.String(), &http2.RequestOptions{}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
-	return out, nil
+	return &out, nil
 }

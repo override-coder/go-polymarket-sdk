@@ -512,3 +512,8 @@ type GetEventsKeysetParams struct {
 	ID           []uint64 `json:"id,omitempty"`
 	Slug         []string `json:"slug,omitempty"`
 }
+
+type GetEventsKeysetResponse struct {
+	Events     []*Event `json:"events"`
+	NextCursor *string  `json:"next_cursor"`
+}
