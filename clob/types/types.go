@@ -5,6 +5,10 @@ import (
 	"github.com/polymarket/go-order-utils/pkg/model"
 )
 
+const (
+	Bytes32Zero = "0x0000000000000000000000000000000000000000000000000000000000000000"
+)
+
 // L2HeaderArgs L2头部参数
 type L2HeaderArgs struct {
 	Method      string `json:"method"`
@@ -66,6 +70,14 @@ type NewOrder struct {
 	DeferExec bool      `json:"deferExec"`
 }
 
+type NewOrderV2 struct {
+	Order     OrderV2   `json:"order"`
+	Owner     string    `json:"owner"`
+	OrderType OrderType `json:"orderType"`
+	DeferExec bool      `json:"deferExec"`
+	PostOnly  bool      `json:"postOnly"`
+}
+
 type Order struct {
 	Salt          int64               `json:"salt"`
 	Maker         string              `json:"maker"`
@@ -79,6 +91,22 @@ type Order struct {
 	FeeRateBps    string              `json:"feeRateBps"`
 	Side          Side                `json:"side"`
 	SignatureType model.SignatureType `json:"signatureType"`
+	Signature     string              `json:"signature"`
+}
+
+type OrderV2 struct {
+	Salt          int64               `json:"salt"`
+	Maker         string              `json:"maker"`
+	Signer        string              `json:"signer"`
+	TokenID       string              `json:"tokenId"`
+	MakerAmount   string              `json:"makerAmount"`
+	TakerAmount   string              `json:"takerAmount"`
+	Side          Side                `json:"side"`
+	SignatureType model.SignatureType `json:"signatureType"`
+	Timestamp     string              `json:"timestamp"`
+	Expiration    string              `json:"expiration"`
+	Metadata      string              `json:"metadata"`
+	Builder       string              `json:"builder"`
 	Signature     string              `json:"signature"`
 }
 
@@ -100,6 +128,28 @@ type CreateOrderOptions struct {
 
 	TickSize TickSize
 	NegRisk  bool
+}
+
+type UserOrderV2 struct {
+	TokenId         string   `json:"tokenId"`
+	ConditionId     *string  `json:"condition_id,omitempty"`
+	Price           float64  `json:"price"`
+	Size            float64  `json:"size"`
+	Side            Side     `json:"side"`
+	Expiration      *int64   `json:"expiration,omitempty"`
+	BuilderCode     *string  `json:"builderCode,omitempty"`
+	BuilderFeeRate  *float64 `json:"builderFeeRate,omitempty"`
+	UserUsdcBalance *float64 `json:"userUsdcBalance,omitempty"`
+	Metadata        *string  `json:"metadata"`
+	TickSize        *string  `json:"tickSize,omitempty"` // Tick size of the order, default to 0.01
+	NegRisk         *bool    `json:"negRisk,omitempty"`  // Whether the order is a negative risk order, default to false}
+}
+
+type CreateOrderOptionsV2 struct {
+	AuthOption *types.AuthOption
+
+	TickSize TickSize `json:"tick_size"`
+	NegRisk  bool     `json:"neg_risk"`
 }
 
 type OrderPayload struct {
@@ -133,6 +183,46 @@ type TickSizes map[string]TickSize
 type NegRisks map[string]bool
 type FeeRates map[string]float64
 type RewardsPercentages map[string]float64
+
+type FeeInfos map[string]FeeInfo
+
+type FeeInfo struct {
+	Rate     float64 `json:"rate"`
+	Exponent float64 `json:"exponent"`
+}
+
+type CLOBMarketInfo struct {
+	GameStartTime            *string                   `json:"gst"`
+	Rewards                  map[string]any            `json:"r"`
+	Tokens                   []CLOBMarketInfoToken     `json:"t"`
+	MinimumOrderSize         float64                   `json:"mos"`
+	MinimumTickSize          float64                   `json:"mts"`
+	MakerBaseFee             int64                     `json:"mbf"`
+	TakerBaseFee             int64                     `json:"tbf"`
+	RFQEnabled               bool                      `json:"rfqe"`
+	TakerOrderDelayEnabled   bool                      `json:"itode"`
+	BlockaidCheckEnabled     bool                      `json:"ibce"`
+	FeeDetails               *CLOBMarketInfoFeeDetails `json:"fd"`
+	MinimumOrderAgeInSeconds int                       `json:"oas"`
+	NegRisk                  *bool                     `json:"nr"`
+}
+
+type CLOBMarketInfoToken struct {
+	TokenID string `json:"t"`
+	Outcome string `json:"o"`
+}
+
+type CLOBMarketInfoFeeDetails struct {
+	Rate      float64 `json:"r"`
+	Exponent  float64 `json:"e"`
+	TakerOnly bool    `json:"to"`
+}
+
+type MarketByTokenResponse struct {
+	ConditionID      string `json:"condition_id"`
+	PrimaryTokenID   string `json:"primary_token_id"`
+	SecondaryTokenID string `json:"secondary_token_id"`
+}
 
 type OrderBookSummary struct {
 	Market         string         `json:"market"`
@@ -206,9 +296,11 @@ type CancelOrder struct {
 type BalanceAllowanceResponse struct {
 	Balance    string `json:"balance"`
 	Allowances struct {
-		CTFExchange        string `json:"0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"`
-		NegRiskCtfExchange string `json:"0xC5d563A36AE78145C45a50134d48A1215220f80a"`
-		NegRiskAdapter     string `json:"0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296"`
+		CTFExchange          string `json:"0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"`
+		NegRiskCtfExchange   string `json:"0xC5d563A36AE78145C45a50134d48A1215220f80a"`
+		CTFExchangeV2        string `json:"0xE111180000d2663C0091e4f400237545B87B996B"`
+		NegRiskCtfExchangeV2 string `json:"0xe2222d279d744050d28e00520010520000310F59"`
+		NegRiskAdapter       string `json:"0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296"`
 	} `json:"allowances"`
 }
 

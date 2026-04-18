@@ -3,14 +3,15 @@ package clob
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"net/http"
+	"time"
+
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	"github.com/override-coder/go-polymarket-sdk/headers"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
 	"github.com/pkg/errors"
-	"math/big"
-	"net/http"
-	"time"
 )
 
 func (c *Client) EnsureAPIKey(ctx context.Context, nonce *big.Int, option *sdktypes.AuthOption) (*sdktypes.ApiKeyCreds, error) {

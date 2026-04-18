@@ -3,14 +3,16 @@ package clob
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
+
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
 	"github.com/override-coder/go-polymarket-sdk/signing"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
 	"github.com/override-coder/go-polymarket-sdk/types/utils"
 	"github.com/polymarket/go-order-utils/pkg/builder"
 	"github.com/polymarket/go-order-utils/pkg/model"
-	"math/big"
-	"strings"
 )
 
 // RoundConfig
@@ -68,6 +70,10 @@ func (o *OrderBuilder) buildOrder(order types.UserOrder, orderType types.OrderTy
 	return o.createOrder(order, orderType, options)
 }
 
+func (o *OrderBuilder) buildOrderV2(order types.UserOrderV2, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrderV2, error) {
+	return o.createOrderV2(order, orderType, options)
+}
+
 func (o *OrderBuilder) createOrder(order types.UserOrder, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrder, error) {
 	orderData := o.buildOrderCreationArgs(order, orderType, roundingConfig[options.TickSize], options.AuthOption)
 	exchangeContract := model.CTFExchange
@@ -75,6 +81,15 @@ func (o *OrderBuilder) createOrder(order types.UserOrder, orderType types.OrderT
 		exchangeContract = model.NegRiskCTFExchange
 	}
 	return buildOrder(o.signFn, exchangeContract, o.chaindId, orderData)
+}
+
+func (o *OrderBuilder) createOrderV2(order types.UserOrderV2, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrderV2, error) {
+	orderData := o.buildOrderCreationArgsV2(order, orderType, roundingConfig[options.TickSize], options.AuthOption)
+	exchangeContract := model.CTFExchange
+	if options.NegRisk {
+		exchangeContract = model.NegRiskCTFExchange
+	}
+	return buildOrderV2(o.signFn, exchangeContract, o.chaindId, orderData)
 }
 
 func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingContract, chainId *big.Int, orderData *model.OrderData) (*model.SignedOrder, error) {
@@ -93,6 +108,26 @@ func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingCon
 	}
 	return &model.SignedOrder{
 		Order:     *order,
+		Signature: signature,
+	}, nil
+}
+
+func buildOrderV2(signFn signing.SignatureFunc, exchangeAddress model.VerifyingContract, chainId *big.Int, orderData *model.OrderDataV2) (*model.SignedOrderV2, error) {
+	cTFExchangeOrderBuilder := builder.NewExchangeOrderBuilderImplV2(chainId, nil)
+	order, err := cTFExchangeOrderBuilder.BuildOrder(orderData)
+	if err != nil {
+		return nil, err
+	}
+	orderHash, err := cTFExchangeOrderBuilder.BuildOrderHash(order, exchangeAddress)
+	if err != nil {
+		return nil, err
+	}
+	signature, err := signFn(order.Signer.String(), orderHash.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	return &model.SignedOrderV2{
+		OrderV2:   *order,
 		Signature: signature,
 	}, nil
 }
@@ -146,6 +181,57 @@ func (o *OrderBuilder) buildOrderCreationArgs(order types.UserOrder, orderType t
 		Expiration:    expiration,
 		Side:          side,
 		SignatureType: option.SignatureType,
+	}
+}
+
+func (o *OrderBuilder) buildOrderCreationArgsV2(order types.UserOrderV2, orderType types.OrderType, roundConfig RoundConfig, option *sdktypes.AuthOption) *model.OrderDataV2 {
+	var (
+		side     model.Side
+		makerAmt float64
+		takerAmt float64
+	)
+	if orderType == types.OrderTypeFAK || orderType == types.OrderTypeFOK {
+		side, makerAmt, takerAmt = getMarketOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
+	} else {
+		side, makerAmt, takerAmt = getOrderRawAmounts(order.Side, order.Size, order.Price, roundConfig)
+	}
+	makerAmount := utils.Pow(utils.Float64ToDecimal(makerAmt), types.CollateralTokenDecimals)
+	takerAmount := utils.Pow(utils.Float64ToDecimal(takerAmt), types.ConditionalTokenDecimals)
+
+	maker := option.SingerAddress
+	if !strings.EqualFold(option.FunderAddress, "") {
+		maker = option.FunderAddress
+	}
+	var (
+		builder    = types.Bytes32Zero
+		metadata   = types.Bytes32Zero
+		expiration = "0"
+	)
+
+	if order.BuilderCode != nil && !strings.EqualFold(*order.BuilderCode, types.Bytes32Zero) {
+		builder = *order.BuilderCode
+	}
+
+	if order.Metadata != nil && !strings.EqualFold(*order.Metadata, types.Bytes32Zero) {
+		metadata = *order.Metadata
+	}
+
+	if order.Expiration != nil && *order.Expiration > 0 {
+		expiration = fmt.Sprintf("%d", *order.Expiration)
+	}
+
+	return &model.OrderDataV2{
+		Maker:         maker,
+		TokenID:       order.TokenId,
+		MakerAmount:   makerAmount.String(),
+		TakerAmount:   takerAmount.String(),
+		Side:          side,
+		Signer:        option.SingerAddress,
+		SignatureType: option.SignatureType,
+		Timestamp:     fmt.Sprintf("%d", time.Now().UnixMilli()),
+		Metadata:      metadata,
+		Builder:       builder,
+		Expiration:    expiration,
 	}
 }
 

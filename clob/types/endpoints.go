@@ -32,6 +32,10 @@ const (
 
 	GET_MARKET = "/markets/"
 
+	GET_CLOB_MARKET = "/clob-markets/"
+
+	GET_MARKET_BY_TOKEN = "/markets-by-token/"
+
 	GET_ORDER_BOOK = "/book"
 
 	GET_ORDER_BOOKS = "/books"
@@ -112,4 +116,6 @@ const (
 
 	// Builder endpoints
 	GET_BUILDER_TRADES = "/builder/trades"
+
+	GET_BUILDER_FEES = "/fees/builder-fees/"
 )
