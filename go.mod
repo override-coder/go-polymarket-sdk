@@ -10,6 +10,7 @@ require (
 	github.com/polymarket/go-order-utils v1.22.6
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/sync v0.10.0
 )
 
 require (
@@ -45,7 +46,6 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
@@ -53,4 +53,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/polymarket/go-order-utils v1.22.6 => github.com/override-coder/go-order-utils v1.22.7-0.20260418123527-e6c08ef1f8d3
+replace github.com/polymarket/go-order-utils v1.22.6 => github.com/override-coder/go-order-utils v1.22.7-0.20260418132128-324f6c46e66d
