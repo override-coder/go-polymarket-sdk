@@ -194,6 +194,7 @@ type Market struct {
 	UmaReward             *string          `json:"umaReward"`
 	FpmmLive              *bool            `json:"fpmmLive"`
 	SportsMarketType      *string          `json:"sportsMarketType"`
+	Line                  *float64         `json:"line"`
 
 	Volume24hrAmm  *decimal.Decimal `json:"volume24hrAmm"`
 	Volume1wkAmm   *decimal.Decimal `json:"volume1wkAmm"`
