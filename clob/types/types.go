@@ -210,3 +210,41 @@ type BalanceAllowanceResponse struct {
 		NegRiskAdapter     string `json:"0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296"`
 	} `json:"allowances"`
 }
+
+type GetTradesRequest struct {
+	ID           string
+	MakerAddress string
+	Market       string
+	AssetID      string
+	Before       string
+	After        string
+	NextCursor   string
+}
+
+type Trade struct {
+	ID              string           `json:"id"`
+	TakerOrderID    string           `json:"taker_order_id"`
+	Market          string           `json:"market"`
+	AssetID         string           `json:"asset_id"`
+	Side            string           `json:"side"`
+	Size            string           `json:"size"`
+	FeeRateBps      string           `json:"fee_rate_bps"`
+	Price           string           `json:"price"`
+	Status          string           `json:"status"`
+	MatchTime       string           `json:"match_time"`
+	LastUpdate      string           `json:"last_update"`
+	Outcome         string           `json:"outcome"`
+	BucketIndex     int              `json:"bucket_index"`
+	Owner           string           `json:"owner"`
+	MakerAddress    string           `json:"maker_address"`
+	TransactionHash string           `json:"transaction_hash"`
+	TraderSide      string           `json:"trader_side"`
+	MakerOrders     []map[string]any `json:"maker_orders"`
+}
+
+type Trades struct {
+	Data       []Trade `json:"data"`
+	NextCursor string  `json:"next_cursor"`
+	Limit      int     `json:"limit"`
+	Count      int     `json:"count"`
+}
