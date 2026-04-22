@@ -24,26 +24,26 @@ func (c *Client) GetTrades(ctx context.Context, req clobtypes.GetTradesRequest, 
 	}
 
 	params := make(map[string]any, 7)
-	if req.ID != "" {
-		params["id"] = req.ID
+	if req.ID != nil && *req.ID != "" {
+		params["id"] = *req.ID
 	}
 	if req.MakerAddress != "" {
 		params["maker_address"] = req.MakerAddress
 	}
-	if req.Market != "" {
-		params["market"] = req.Market
+	if req.Market != nil && *req.Market != "" {
+		params["market"] = *req.Market
 	}
-	if req.AssetID != "" {
-		params["asset_id"] = req.AssetID
+	if req.AssetID != nil && *req.AssetID != "" {
+		params["asset_id"] = *req.AssetID
 	}
-	if req.Before != "" {
-		params["before"] = req.Before
+	if req.Before != nil && *req.Before != "" {
+		params["before"] = *req.Before
 	}
-	if req.After != "" {
-		params["after"] = req.After
+	if req.After != nil && *req.After != "" {
+		params["after"] = *req.After
 	}
-	if req.NextCursor != "" {
-		params["next_cursor"] = req.NextCursor
+	if req.NextCursor != nil && *req.NextCursor != "" {
+		params["next_cursor"] = *req.NextCursor
 	}
 
 	var resp clobtypes.Trades

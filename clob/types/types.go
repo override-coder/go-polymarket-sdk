@@ -212,13 +212,13 @@ type BalanceAllowanceResponse struct {
 }
 
 type GetTradesRequest struct {
-	ID           string
+	ID           *string
 	MakerAddress string
-	Market       string
-	AssetID      string
-	Before       string
-	After        string
-	NextCursor   string
+	Market       *string
+	AssetID      *string
+	Before       *string
+	After        *string
+	NextCursor   *string
 }
 
 type Trade struct {
