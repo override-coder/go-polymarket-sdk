@@ -22,8 +22,8 @@ func (c *Client) GetMarketsBySlug(ctx context.Context, slug string) (*types.Mark
 	return &out, nil
 }
 
-func (c *Client) GetMarketsByID(ctx context.Context, id uint64) (*types.Market, error) {
-	requestPath := fmt.Sprintf("%s%d", types.GET_MARKETS_ID, id)
+func (c *Client) GetMarketsByID(ctx context.Context, id string) (*types.Market, error) {
+	requestPath := fmt.Sprintf("%s%s", types.GET_MARKETS_ID, id)
 
 	var out types.Market
 	resp, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
@@ -76,6 +76,9 @@ func (c *Client) GetMarkets(ctx context.Context, p *types.GetMarketsParams) ([]*
 	}
 	if p.EndDateMax != nil && strings.TrimSpace(*p.EndDateMax) != "" {
 		qs.Set("end_date_max", strings.TrimSpace(*p.EndDateMax))
+	}
+	if p.Locale != nil && strings.TrimSpace(*p.Locale) != "" {
+		qs.Set("locale", strings.TrimSpace(*p.Locale))
 	}
 	if p.TagID != nil {
 		qs.Set("tag_id", strconv.Itoa(int(*p.TagID)))
