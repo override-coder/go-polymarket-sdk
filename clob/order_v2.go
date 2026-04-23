@@ -63,8 +63,7 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 		negRisk = risk
 	}
 
-	// 调整比例
-	c.adjustBuyMarketOrderAmountForFees(userOrder, tokenID)
+	c.adjustBuyMarketOrderAmountForFees(userOrder, tokenID, orderType)
 
 	signedOrder, err := c.orderBuilder.buildOrderV2(*userOrder, orderType, types.CreateOrderOptions{
 		AuthOption: option,
@@ -138,12 +137,16 @@ func orderToJson2(order *model.SignedOrderV2, owner string, orderType *types.Ord
 	}
 }
 
-func (c *Client) adjustBuyMarketOrderAmountForFees(order *types.UserOrderV2, tokenID string) {
+func (c *Client) adjustBuyMarketOrderAmountForFees(order *types.UserOrderV2, tokenID string, orderType types.OrderType) {
 	if order == nil {
 		return
 	}
 
 	if order.Side != types.BUY {
+		return
+	}
+
+	if orderType != types.OrderTypeFAK && orderType != types.OrderTypeFOK {
 		return
 	}
 
@@ -160,6 +163,7 @@ func (c *Client) adjustBuyMarketOrderAmountForFees(order *types.UserOrderV2, tok
 	}
 
 	feeInfo := c.getCachedFeeInfo(tokenID)
+
 	order.Size = adjustBuyAmountForFees(
 		order.Size,
 		price,
@@ -184,7 +188,10 @@ func adjustBuyAmountForFees(
 	totalCost := amount + platformFee + amount*builderTakerFeeRate
 
 	if userUSDCBalance <= totalCost {
-		return userUSDCBalance / (1 + platformFeeRate/price + builderTakerFeeRate)
+		adjustAmount := userUSDCBalance / (1 + platformFeeRate/price + builderTakerFeeRate)
+		if adjustAmount >= 1 {
+			return adjustAmount
+		}
 	}
 	return amount
 }

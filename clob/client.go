@@ -227,15 +227,15 @@ func (c *Client) GetMarketPrice(ctx context.Context, tokenID, side string) (stri
 	return resp["price"], nil
 }
 
-func (c *Client) GetBuilderFee(ctx context.Context, builderCode string) (string, error) {
+func (c *Client) GetBuilderFee(ctx context.Context, builderCode string) (string, string, error) {
 	var resp map[string]string
 	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_BUILDER_FEES, &http2.RequestOptions{
 		Params: map[string]any{"builder_code": builderCode},
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
-		return "", errors.Wrap(e, "get market price")
+		return "", "", errors.Wrap(e, "get market price")
 	}
-	return resp["price"], nil
+	return resp["builder_maker_fee_rate_bps"], resp["builder_taker_fee_rate_bps"], nil
 }
 
 func (c *Client) GetMarketPrices(ctx context.Context, prices []types.PricesRequest) (map[string]string, error) {
