@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"net/http"
+
 	"github.com/override-coder/go-polymarket-sdk/gamma/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
-	"net/http"
 )
 
 func (c *Client) GetEventsBySlug(ctx context.Context, slug string) (*types.Event, error) {
@@ -23,8 +24,8 @@ func (c *Client) GetEventsBySlug(ctx context.Context, slug string) (*types.Event
 	return &out, nil
 }
 
-func (c *Client) GetEventsByID(ctx context.Context, id uint64) (*types.Event, error) {
-	requestPath := fmt.Sprintf("%s%d", types.GET_EVENTS_ID, id)
+func (c *Client) GetEventsByID(ctx context.Context, id string) (*types.Event, error) {
+	requestPath := fmt.Sprintf("%s%s", types.GET_EVENTS_ID, id)
 
 	var out types.Event
 	resp, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{}, &out)
@@ -73,6 +74,9 @@ func (c *Client) GetEventsByKeyset(ctx context.Context, params *types.GetEventsK
 	}
 	if params.TagMatch != nil && strings.TrimSpace(*params.TagMatch) != "" {
 		qs.Set("tag_match", strings.TrimSpace(*params.TagMatch))
+	}
+	if params.Locale != nil && strings.TrimSpace(*params.Locale) != "" {
+		qs.Set("locale", strings.TrimSpace(*params.Locale))
 	}
 	if len(params.ExcludeTagID) > 0 {
 		for _, id := range params.ExcludeTagID {

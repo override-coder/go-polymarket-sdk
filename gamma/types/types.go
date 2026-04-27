@@ -463,6 +463,7 @@ type GetMarketsParams struct {
 	QuestionIDs       []string         `json:"question_ids,omitempty"`
 	IncludeTag        *bool            `json:"include_tag,omitempty"`
 	Closed            *bool            `json:"closed,omitempty"`
+	Locale            *string          `json:"locale,omitempty"`
 }
 
 type GetMarketsKeysetParams struct {
@@ -546,6 +547,7 @@ type GetEventsKeysetParams struct {
 	EndDateMin   *string  `json:"end_date_min,omitempty"`
 	StartDateMax *string  `json:"start_date_max,omitempty"`
 	StartDateMin *string  `json:"start_date_min,omitempty"`
+	Locale       *string  `json:"locale,omitempty"`
 	VolumeMax    *float64 `json:"volume_max,omitempty"`
 	VolumeMin    *float64 `json:"volume_min,omitempty"`
 	LiquidityMax *float64 `json:"liquidity_max,omitempty"`
