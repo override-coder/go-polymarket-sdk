@@ -88,15 +88,16 @@ func (c *Client) GetBalanceAllowance(option *sdktypes.AuthOption) (*types.Balanc
 	return &resp, nil
 }
 
-func (c *Client) UpdateBalanceAllowance(option *sdktypes.AuthOption) (map[string]interface{}, error) {
+func (c *Client) UpdateBalanceAllowance(params map[string]any, option *sdktypes.AuthOption) (map[string]interface{}, error) {
 
 	requestPath := fmt.Sprintf("%s", types.UPDATE_BALANCE_ALLOWANCE)
 
 	ts := time.Now().Unix()
 
-	params := make(map[string]any)
-	params["asset_type"] = "COLLATERAL"
-	params["signature_type"] = 2
+	//params := make(map[string]any)
+	//params["asset_type"] = "CONDITIONAL"
+	//params["token_id"] = "45763018441764333771124945243746174684578244015331389396782339063349542289693"
+	//params["signature_type"] = 2
 
 	l2HeaderArgs := types.L2HeaderArgs{
 		Method:      http.MethodGet,
