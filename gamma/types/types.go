@@ -466,6 +466,45 @@ type GetMarketsParams struct {
 	Locale            *string          `json:"locale,omitempty"`
 }
 
+type GetMarketsKeysetParams struct {
+	Limit       *int    `json:"limit,omitempty"`
+	Order       *string `json:"order,omitempty"`
+	Ascending   *bool   `json:"ascending,omitempty"`
+	AfterCursor *string `json:"after_cursor,omitempty"`
+
+	ID                []uint64         `json:"id,omitempty"`
+	Slug              []string         `json:"slug,omitempty"`
+	Closed            *bool            `json:"closed,omitempty"`
+	Decimalized       *bool            `json:"decimalized,omitempty"`
+	CLOBTokenIDs      []string         `json:"clob_token_ids,omitempty"`
+	ConditionIDs      []string         `json:"condition_ids,omitempty"`
+	QuestionIDs       []string         `json:"question_ids,omitempty"`
+	MarketMakerAddr   []string         `json:"market_maker_address,omitempty"`
+	LiquidityNumMin   *decimal.Decimal `json:"liquidity_num_min,omitempty"`
+	LiquidityNumMax   *decimal.Decimal `json:"liquidity_num_max,omitempty"`
+	VolumeNumMin      *decimal.Decimal `json:"volume_num_min,omitempty"`
+	VolumeNumMax      *decimal.Decimal `json:"volume_num_max,omitempty"`
+	StartDateMin      *string          `json:"start_date_min,omitempty"`
+	StartDateMax      *string          `json:"start_date_max,omitempty"`
+	EndDateMin        *string          `json:"end_date_min,omitempty"`
+	EndDateMax        *string          `json:"end_date_max,omitempty"`
+	TagID             []uint64         `json:"tag_id,omitempty"`
+	RelatedTags       *bool            `json:"related_tags,omitempty"`
+	TagMatch          *string          `json:"tag_match,omitempty"`
+	CYOM              *bool            `json:"cyom,omitempty"`
+	RFQEnabled        *bool            `json:"rfq_enabled,omitempty"`
+	UMAResolution     *string          `json:"uma_resolution_status,omitempty"`
+	GameID            *string          `json:"game_id,omitempty"`
+	SportsMarketTypes []string         `json:"sports_market_types,omitempty"`
+	IncludeTag        *bool            `json:"include_tag,omitempty"`
+	Locale            *string          `json:"locale,omitempty"`
+}
+
+type GetMarketsKeysetResponse struct {
+	Markets    []Market `json:"markets"`
+	NextCursor *string  `json:"next_cursor"`
+}
+
 type PublicProfileParams struct {
 	Address string `json:"address"`
 }

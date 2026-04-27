@@ -5,6 +5,7 @@ const (
 	GET_EVENTS_SLUG                      = "/events/slug/"
 	GET_EVENTS_KEYSET                    = "/events/keyset"
 	GET_MARKETS                          = "/markets"
+	GET_MARKETS_KEYSET                   = "/markets/keyset"
 	GET_MARKETS_ID                       = "/markets/"
 	GET_MARKETS_SLUG                     = "/markets/slug/"
 	GET_PUBLIC_SEARCH                    = "/public-search"
