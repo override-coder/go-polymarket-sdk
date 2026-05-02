@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"net/http"
+	"strings"
+	"time"
+
 	clobtypes "github.com/override-coder/go-polymarket-sdk/clob/types"
 	sdkheaders "github.com/override-coder/go-polymarket-sdk/headers"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
@@ -11,10 +16,6 @@ import (
 	"github.com/override-coder/go-polymarket-sdk/signing"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
 	"github.com/pkg/errors"
-	"math/big"
-	"net/http"
-	"strings"
-	"time"
 )
 
 type Client struct {
@@ -24,7 +25,8 @@ type Client struct {
 	signFn             signing.SignatureFunc
 	builderApiKeyCreds *sdktypes.BuilderApiKeyCreds
 
-	contractConfig *types.ContractConfig
+	contractConfig              *types.ContractConfig
+	depositWalletContractConfig *types.DepositWalletContractConfig
 }
 
 func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, builderApiKeyCreds *sdktypes.BuilderApiKeyCreds) *Client {
@@ -32,11 +34,12 @@ func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, buil
 		host = host[:len(host)-1]
 	}
 	return &Client{
-		client:             http2.NewClient(host),
-		chainId:            chainId,
-		builderApiKeyCreds: builderApiKeyCreds,
-		signFn:             signFn,
-		contractConfig:     types.GetContractConfig(chainId),
+		client:                      http2.NewClient(host),
+		chainId:                     chainId,
+		builderApiKeyCreds:          builderApiKeyCreds,
+		signFn:                      signFn,
+		contractConfig:              types.GetContractConfig(chainId),
+		depositWalletContractConfig: types.GetDepositWalletContractConfig(chainId),
 	}
 }
 
@@ -423,6 +426,77 @@ func (c *Client) ExecuteByTx(reqBody *types.TransactionRequest, option *sdktypes
 		Headers: headers,
 		Data:    body,
 	}, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return &out, nil
+}
+
+func (c *Client) GetExpectedDepositWallet(ownerAddr string) (string, error) {
+	cfg := c.depositWalletContractConfig
+	if cfg.DepositWalletFactory == "" || cfg.DepositWalletImplementation == "" {
+		return "", fmt.Errorf("deposit wallet config unsupported on this chain")
+	}
+	addr, err := deriveDepositWallet(
+		ownerAddr,
+		cfg.DepositWalletFactory,
+		cfg.DepositWalletImplementation,
+	)
+	if err != nil {
+		return "", fmt.Errorf("getExpectedDepositWallet: %w", err)
+	}
+	return addr, nil
+}
+
+func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if option == nil {
+		return nil, fmt.Errorf("deploy deposit wallet: nil auth option")
+	}
+	from := option.SingerAddress
+	if from == "" {
+		return nil, fmt.Errorf("deploy deposit wallet: empty signer address")
+	}
+	depositWalletConfig := c.depositWalletContractConfig
+	reqBody := types.DepositWalletCreateRequest{
+		Type: string(types.TransactionTypeWALLETCreate),
+		From: from,
+		To:   depositWalletConfig.DepositWalletFactory,
+	}
+
+	payloadBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("deploy deposit wallet: marshal request failed: %w", err)
+	}
+	body := string(payloadBytes)
+
+	builderApiKeyCreds := option.BuilderApiKeyCreds
+	if builderApiKeyCreds == nil {
+		builderApiKeyCreds = c.builderApiKeyCreds
+	}
+	headers, err := sdkheaders.CreateL2BuilderHeaders(
+		builderApiKeyCreds,
+		clobtypes.L2HeaderArgs{
+			Method:      http.MethodPost,
+			RequestPath: types.SUBMIT_TRANSACTION,
+			Body:        body,
+		},
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("deploy deposit wallet: create header failed: %w", err)
+	}
+
+	var out types.RelayerTransactionResponse
+	resp, err := c.client.DoRequest(
+		context.Background(),
+		http.MethodPost,
+		types.SUBMIT_TRANSACTION,
+		&http2.RequestOptions{
+			Headers: headers,
+			Data:    body,
+		},
+		&out,
+	)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}

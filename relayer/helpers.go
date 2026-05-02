@@ -3,12 +3,20 @@ package relayer
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/override-coder/go-polymarket-sdk/relayer/types"
 	"github.com/override-coder/go-polymarket-sdk/signing"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
-	"math/big"
+)
+
+var (
+	erc1967Const1 = common.FromHex("0xcc3735a920a3ca505d382bbc545af43d6000803e6038573d6000fd5b3d6000f3")
+	erc1967Const2 = common.FromHex("0x5155f3363d3d373d3d363d7f360894a13ba1a3210667c828492db98dca3e2076")
+	erc1967Prefix = mustBigInt("0x61003d3d8160233d3973")
 )
 
 func buildSafeCreateTransactionRequest(
@@ -69,6 +77,82 @@ func deriveSafe(ownerAddress string, safeFactory string) (string, error) {
 
 	computedAddress := crypto.CreateAddress2(factoryAddr, salt32, initCodeHashBytes)
 	return computedAddress.Hex(), nil
+}
+
+func deriveDepositWallet(ownerAddress, factoryAddress, implementationAddress string) (string, error) {
+	if !common.IsHexAddress(ownerAddress) {
+		return "", fmt.Errorf("deriveDepositWallet: invalid owner address: %s", ownerAddress)
+	}
+	if !common.IsHexAddress(factoryAddress) {
+		return "", fmt.Errorf("deriveDepositWallet: invalid factory address: %s", factoryAddress)
+	}
+	if !common.IsHexAddress(implementationAddress) {
+		return "", fmt.Errorf("deriveDepositWallet: invalid implementation address: %s", implementationAddress)
+	}
+
+	owner := common.HexToAddress(ownerAddress)
+	factory := common.HexToAddress(factoryAddress)
+	implementation := common.HexToAddress(implementationAddress)
+
+	walletID := common.LeftPadBytes(owner.Bytes(), 32)
+
+	args, err := abi.Arguments{
+		{Type: mustABIType("address")},
+		{Type: mustABIType("bytes32")},
+	}.Pack(factory, [32]byte(walletID))
+	if err != nil {
+		return "", fmt.Errorf("deriveDepositWallet: abi pack args: %w", err)
+	}
+
+	salt := crypto.Keccak256(args)
+	bytecodeHash := initCodeHashERC1967(implementation, args)
+
+	var salt32 [32]byte
+	copy(salt32[:], salt)
+
+	computed := crypto.CreateAddress2(factory, salt32, bytecodeHash)
+	return computed.Hex(), nil
+}
+
+func initCodeHashERC1967(implementation common.Address, args []byte) []byte {
+	n := big.NewInt(int64(len(args)))
+	shiftedN := new(big.Int).Lsh(n, 56)
+	combined := new(big.Int).Add(new(big.Int).Set(erc1967Prefix), shiftedN)
+
+	prefixBytes := leftPadBigInt(combined, 10)
+
+	initCode := make([]byte, 0, 10+20+2+32+32+len(args))
+	initCode = append(initCode, prefixBytes...)
+	initCode = append(initCode, implementation.Bytes()...)
+	initCode = append(initCode, 0x60, 0x09)
+	initCode = append(initCode, erc1967Const2...)
+	initCode = append(initCode, erc1967Const1...)
+	initCode = append(initCode, args...)
+
+	return crypto.Keccak256(initCode)
+}
+
+func mustBigInt(v string) *big.Int {
+	n, ok := new(big.Int).SetString(v[2:], 16)
+	if !ok {
+		panic("invalid big int: " + v)
+	}
+	return n
+}
+
+func leftPadBigInt(v *big.Int, size int) []byte {
+	out := make([]byte, size)
+	b := v.Bytes()
+	copy(out[size-len(b):], b)
+	return out
+}
+
+func mustABIType(t string) abi.Type {
+	typ, err := abi.NewType(t, "", nil)
+	if err != nil {
+		panic(err)
+	}
+	return typ
 }
 
 func buildSafeTransactionRequest(signatureFunc signing.SignatureFunc, args types.SafeTransactionArgs, safeCfg *types.ContractConfig, metadata string) (*types.TransactionRequest, error) {

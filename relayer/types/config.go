@@ -18,3 +18,20 @@ func GetContractConfig(chainId *big.Int) *ContractConfig {
 		panic("invalid chain id")
 	}
 }
+
+type DepositWalletContractConfig struct {
+	DepositWalletFactory        string
+	DepositWalletImplementation string
+}
+
+func GetDepositWalletContractConfig(chainId *big.Int) *DepositWalletContractConfig {
+	switch chainId.Int64() {
+	case 137:
+		return &DepositWalletContractConfig{
+			DepositWalletFactory:        "0x00000000000Fb5C9ADea0298D729A0CB3823Cc07",
+			DepositWalletImplementation: "0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB",
+		}
+	default:
+		panic("invalid chain id")
+	}
+}

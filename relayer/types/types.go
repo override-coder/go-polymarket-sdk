@@ -7,6 +7,9 @@ type TransactionType string
 const (
 	TransactionTypeSAFE       TransactionType = "SAFE"
 	TransactionTypeSAFECreate TransactionType = "SAFE-CREATE"
+
+	TransactionTypeWALLET       TransactionType = "WALLET"
+	TransactionTypeWALLETCreate TransactionType = "WALLET-CREATE"
 )
 
 type SignatureParams struct {
@@ -106,4 +109,10 @@ type RelayerTransactionResponse struct {
 
 type GetDeployedResponse struct {
 	Deployed bool `json:"deployed"`
+}
+
+type DepositWalletCreateRequest struct {
+	Type string `json:"type"`
+	From string `json:"from"`
+	To   string `json:"to"`
 }
