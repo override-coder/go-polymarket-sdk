@@ -223,6 +223,91 @@ func buildSafeTransactionRequest(signatureFunc signing.SignatureFunc, args types
 	return req, nil
 }
 
+func buildDepositWalletBatchRequest(
+	signatureFunc signing.SignatureFunc,
+	args types.DepositWalletTransactionArgs,
+	cfg *types.DepositWalletContractConfig,
+) (*types.DepositWalletBatchRequest, error) {
+	signature, err := signing.BuildDepositWalletBatchSignature(
+		signatureFunc,
+		args.ChainID,
+		args.From,
+		args.WalletAddress,
+		args.Nonce,
+		args.Deadline,
+		args.Calls,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build deposit wallet batch request: sign batch failed: %w", err)
+	}
+
+	req := &types.DepositWalletBatchRequest{
+		Type:      string(types.TransactionTypeWALLET),
+		From:      args.From,
+		To:        cfg.DepositWalletFactory,
+		Nonce:     args.Nonce,
+		Signature: signature,
+		DepositWalletParams: types.DepositWalletParams{
+			DepositWallet: args.WalletAddress,
+			Deadline:      args.Deadline,
+			Calls:         args.Calls,
+		},
+	}
+	return req, nil
+}
+
+func buildDepositWalletExecuteRequest(
+	signatureFunc signing.SignatureFunc,
+	args types.DepositWalletTransactionArgs,
+) (*types.DepositWalletExecuteRequest, error) {
+	signature, err := signing.BuildDepositWalletBatchSignature(
+		signatureFunc,
+		args.ChainID,
+		args.From,
+		args.WalletAddress,
+		args.Nonce,
+		args.Deadline,
+		args.Calls,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build deposit wallet execute request: sign batch failed: %w", err)
+	}
+
+	execCalls := make([]types.Call, 0, len(args.Calls))
+	for _, call := range args.Calls {
+		value, ok := new(big.Int).SetString(call.Value, 10)
+		if !ok {
+			return nil, fmt.Errorf("build deposit wallet execute request: invalid call value: %s", call.Value)
+		}
+		execCalls = append(execCalls, types.Call{
+			Target: common.HexToAddress(call.Target),
+			Value:  value,
+			Data:   common.FromHex(call.Data),
+		})
+	}
+
+	nonce, ok := new(big.Int).SetString(args.Nonce, 10)
+	if !ok {
+		return nil, fmt.Errorf("build deposit wallet execute request: invalid nonce: %s", args.Nonce)
+	}
+	deadline, ok := new(big.Int).SetString(args.Deadline, 10)
+	if !ok {
+		return nil, fmt.Errorf("build deposit wallet execute request: invalid deadline: %s", args.Deadline)
+	}
+
+	req := &types.DepositWalletExecuteRequest{
+		WalletAddress: args.WalletAddress,
+		Batch: types.Batch{
+			Wallet:   common.HexToAddress(args.WalletAddress),
+			Nonce:    nonce,
+			Deadline: deadline,
+			Calls:    execCalls,
+		},
+		Signature: signature,
+	}
+	return req, nil
+}
+
 // aggregateTransaction
 func aggregateTransaction(txns []types.SafeTransaction, multisendAddr string) (types.SafeTransaction, error) {
 	if len(txns) == 1 {

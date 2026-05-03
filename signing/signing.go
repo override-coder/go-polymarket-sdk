@@ -21,6 +21,9 @@ const (
 	ClobAuthDomainMsgToSign = "This message attests that I control the given wallet"
 
 	SafeFactoryName = "Polymarket Contract Proxy Factory"
+
+	DepositWalletDomainName    = "DepositWallet"
+	DepositWalletDomainVersion = "1"
 )
 
 func BuildClobEip712Signature(signatureFunc SignatureFunc, chainId *big.Int, singer, ts string, nonce *big.Int) (sigHex string, err error) {
@@ -171,6 +174,72 @@ func BuildSafeCreateSafeSignature(
 		return nil, fmt.Errorf("signature failed: %w", err)
 	}
 	return sigBytes, nil
+}
+
+func BuildDepositWalletBatchSignature(
+	signatureFunc SignatureFunc,
+	chainID int64,
+	from string,
+	walletAddress string,
+	nonce string,
+	deadline string,
+	calls []types.DepositWalletCall,
+) (string, error) {
+	typedCalls := make([]map[string]interface{}, 0, len(calls))
+	for _, call := range calls {
+		typedCalls = append(typedCalls, map[string]interface{}{
+			"target": call.Target,
+			"value":  call.Value,
+			"data":   call.Data,
+		})
+	}
+
+	typedData := apitypes.TypedData{
+		Types: apitypes.Types{
+			"EIP712Domain": []apitypes.Type{
+				{Name: "name", Type: "string"},
+				{Name: "version", Type: "string"},
+				{Name: "chainId", Type: "uint256"},
+				{Name: "verifyingContract", Type: "address"},
+			},
+			"Call": []apitypes.Type{
+				{Name: "target", Type: "address"},
+				{Name: "value", Type: "uint256"},
+				{Name: "data", Type: "bytes"},
+			},
+			"Batch": []apitypes.Type{
+				{Name: "wallet", Type: "address"},
+				{Name: "nonce", Type: "uint256"},
+				{Name: "deadline", Type: "uint256"},
+				{Name: "calls", Type: "Call[]"},
+			},
+		},
+		PrimaryType: "Batch",
+		Domain: apitypes.TypedDataDomain{
+			Name:              DepositWalletDomainName,
+			Version:           DepositWalletDomainVersion,
+			ChainId:           math.NewHexOrDecimal256(chainID),
+			VerifyingContract: common.HexToAddress(walletAddress).Hex(),
+		},
+		Message: apitypes.TypedDataMessage{
+			"wallet":   walletAddress,
+			"nonce":    nonce,
+			"deadline": deadline,
+			"calls":    typedCalls,
+		},
+	}
+
+	hash, _, err := apitypes.TypedDataAndHash(typedData)
+	if err != nil {
+		return "", fmt.Errorf("build deposit wallet batch TypedDataAndHash failed: %w", err)
+	}
+
+	sigBytes, err := signatureFunc(from, hash)
+	if err != nil {
+		return "", fmt.Errorf("signature failed: %w", err)
+	}
+
+	return "0x" + hex.EncodeToString(sigBytes), nil
 }
 
 func BuildPolyHmacSignature(secret string, timestamp string, method string, requestPath string, body *string) (string, error) {

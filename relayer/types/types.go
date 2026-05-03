@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type TransactionType string
 
@@ -71,6 +74,66 @@ type SafeCreateTransactionArgs struct {
 	PaymentToken    string `json:"paymentToken"`
 	Payment         string `json:"payment"`
 	PaymentReceiver string `json:"paymentReceiver"`
+}
+
+type DepositWalletCall struct {
+	Target string `json:"target"`
+	Value  string `json:"value"`
+	Data   string `json:"data"`
+}
+
+type DepositWalletTransactionArgs struct {
+	From          string              `json:"from"`
+	ChainID       int64               `json:"chainId"`
+	WalletAddress string              `json:"walletAddress"`
+	Nonce         string              `json:"nonce"`
+	Deadline      string              `json:"deadline"`
+	Calls         []DepositWalletCall `json:"calls"`
+}
+
+type DepositWalletParams struct {
+	DepositWallet string              `json:"depositWallet"`
+	Deadline      string              `json:"deadline"`
+	Calls         []DepositWalletCall `json:"calls"`
+}
+
+type DepositWalletBatchRequest struct {
+	Type                string              `json:"type"`
+	From                string              `json:"from"`
+	To                  string              `json:"to"`
+	Nonce               string              `json:"nonce"`
+	Signature           string              `json:"signature"`
+	DepositWalletParams DepositWalletParams `json:"depositWalletParams"`
+}
+
+type DepositWalletExecuteRequest struct {
+	WalletAddress string `json:"walletAddress"`
+	Batch         Batch  `json:"batch"`
+	Signature     string `json:"signature"`
+}
+
+func DepositWalletCallFromSafeTransaction(txn SafeTransaction) (DepositWalletCall, error) {
+	if txn.Operation != OperationCall {
+		return DepositWalletCall{}, fmt.Errorf("unsupported safe transaction operation for deposit wallet call: %d", txn.Operation)
+	}
+
+	return DepositWalletCall{
+		Target: txn.To,
+		Value:  txn.Value,
+		Data:   txn.Data,
+	}, nil
+}
+
+func DepositWalletCallsFromSafeTransactions(txns []SafeTransaction) ([]DepositWalletCall, error) {
+	calls := make([]DepositWalletCall, 0, len(txns))
+	for _, txn := range txns {
+		call, err := DepositWalletCallFromSafeTransaction(txn)
+		if err != nil {
+			return nil, err
+		}
+		calls = append(calls, call)
+	}
+	return calls, nil
 }
 
 type RelayerTransactionState string
