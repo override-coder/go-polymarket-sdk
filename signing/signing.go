@@ -1,18 +1,20 @@
 package signing
 
 import (
+	"crypto/ecdsa"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/override-coder/go-polymarket-sdk/relayer/types"
-	"math/big"
-	"strings"
 )
 
 const (
@@ -60,7 +62,14 @@ func BuildClobEip712Signature(signatureFunc SignatureFunc, chainId *big.Int, sin
 		return "", fmt.Errorf("TypedDataAndHash failed: %w", err)
 	}
 
-	sigBytes, err := signatureFunc(singer, hash)
+	sigBytes, err := signatureFunc(singer, func(key *ecdsa.PrivateKey) ([]byte, error) {
+		sig, err2 := crypto.Sign(hash, key)
+		if err2 != nil {
+			return nil, err2
+		}
+		sig[64] += 27
+		return sig, nil
+	})
 	if err != nil {
 		return "", fmt.Errorf("signature failed: %w", err)
 	}
@@ -100,7 +109,14 @@ func BuildSafeCreateTransactionEip712Signature(signatureFunc SignatureFunc, chai
 		return "", fmt.Errorf("build safe createTransaction TypedDataAndHash failed: %w", err)
 	}
 
-	sigBytes, err := signatureFunc(singer, hash)
+	sigBytes, err := signatureFunc(singer, func(key *ecdsa.PrivateKey) ([]byte, error) {
+		sig, err2 := crypto.Sign(hash, key)
+		if err2 != nil {
+			return nil, err2
+		}
+		sig[64] += 27
+		return sig, nil
+	})
 	if err != nil {
 		return "", fmt.Errorf("signature failed: %w", err)
 	}
@@ -169,7 +185,14 @@ func BuildSafeCreateSafeSignature(
 
 	prefixedHash := crypto.Keccak256Hash([]byte(fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(structHash), structHash)))
 
-	sigBytes, err := signatureFunc(from, prefixedHash.Bytes())
+	sigBytes, err := signatureFunc(from, func(key *ecdsa.PrivateKey) ([]byte, error) {
+		sig, err2 := crypto.Sign(prefixedHash.Bytes(), key)
+		if err2 != nil {
+			return nil, err2
+		}
+		sig[64] += 27
+		return sig, nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("signature failed: %w", err)
 	}
@@ -234,7 +257,14 @@ func BuildDepositWalletBatchSignature(
 		return "", fmt.Errorf("build deposit wallet batch TypedDataAndHash failed: %w", err)
 	}
 
-	sigBytes, err := signatureFunc(from, hash)
+	sigBytes, err := signatureFunc(from, func(key *ecdsa.PrivateKey) ([]byte, error) {
+		sig, err2 := crypto.Sign(hash, key)
+		if err2 != nil {
+			return nil, err2
+		}
+		sig[64] += 27
+		return sig, nil
+	})
 	if err != nil {
 		return "", fmt.Errorf("signature failed: %w", err)
 	}

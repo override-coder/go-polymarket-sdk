@@ -1,3 +1,5 @@
 package signing
 
-type SignatureFunc func(signer string, digest []byte) ([]byte, error)
+import "crypto/ecdsa"
+
+type SignatureFunc func(signer string, fn func(key *ecdsa.PrivateKey) ([]byte, error)) ([]byte, error)
