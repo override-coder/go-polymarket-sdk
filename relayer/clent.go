@@ -509,7 +509,6 @@ func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.Relaye
 
 func (c *Client) BuildDepositWalletBatch(
 	calls []types.DepositWalletCall,
-	walletAddress string,
 	deadline string,
 	option *sdktypes.AuthOption,
 ) (*types.DepositWalletBatchRequest, error) {
@@ -519,6 +518,10 @@ func (c *Client) BuildDepositWalletBatch(
 	from := option.SingerAddress
 	if from == "" {
 		return nil, fmt.Errorf("build deposit wallet batch: empty signer address")
+	}
+	walletAddress, err := c.GetExpectedDepositWallet(from)
+	if err != nil {
+		return nil, err
 	}
 	if walletAddress == "" {
 		return nil, fmt.Errorf("build deposit wallet batch: empty wallet address")
@@ -556,11 +559,10 @@ func (c *Client) BuildDepositWalletBatch(
 
 func (c *Client) ExecuteDepositWalletBatch(
 	calls []types.DepositWalletCall,
-	walletAddress string,
 	deadline string,
 	option *sdktypes.AuthOption,
 ) (*types.RelayerTransactionResponse, error) {
-	reqBody, err := c.BuildDepositWalletBatch(calls, walletAddress, deadline, option)
+	reqBody, err := c.BuildDepositWalletBatch(calls, deadline, option)
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +609,6 @@ func (c *Client) ExecuteDepositWalletBatch(
 
 func (c *Client) BuildDepositWalletDirectTx(
 	calls []types.DepositWalletCall,
-	walletAddress string,
 	nonceAt *big.Int,
 	deadline string,
 	option *sdktypes.AuthOption,
@@ -618,6 +619,10 @@ func (c *Client) BuildDepositWalletDirectTx(
 	from := option.SingerAddress
 	if from == "" {
 		return nil, fmt.Errorf("build deposit wallet batch: empty signer address")
+	}
+	walletAddress, err := c.GetExpectedDepositWallet(from)
+	if err != nil {
+		return nil, err
 	}
 	if walletAddress == "" {
 		return nil, fmt.Errorf("build deposit wallet batch: empty wallet address")
