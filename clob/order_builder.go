@@ -1,7 +1,6 @@
 package clob
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -103,9 +102,7 @@ func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingCon
 	if err != nil {
 		return nil, err
 	}
-	signature, err := signFn(order.Signer.String(), func(key *ecdsa.PrivateKey) ([]byte, error) {
-		return cTFExchangeOrderBuilder.BuildOrderSignature(key, orderHash)
-	})
+	signature, err := signFn(order.Signer.String(), orderHash.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -117,19 +114,40 @@ func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingCon
 
 func buildOrderV2(signFn signing.SignatureFunc, exchangeAddress model.VerifyingContract, chainId *big.Int, orderData *model.OrderDataV2) (*model.SignedOrderV2, error) {
 	cTFExchangeOrderBuilder := builder.NewExchangeOrderBuilderImplV2(chainId, nil)
-	signedOrderV2 := new(model.SignedOrderV2)
-	_, err := signFn(orderData.Signer, func(key *ecdsa.PrivateKey) ([]byte, error) {
-		order, err := cTFExchangeOrderBuilder.BuildSignedOrder(key, orderData, exchangeAddress)
-		if err != nil {
-			return nil, err
-		}
-		signedOrderV2 = order
-		return nil, nil
-	})
+	order, err := cTFExchangeOrderBuilder.BuildOrder(orderData)
 	if err != nil {
 		return nil, err
 	}
-	return signedOrderV2, nil
+	var signature model.OrderSignatureV2
+	var sigErr error
+	if orderData.SignatureType != model.POLY_1271 {
+		orderHash, err2 := cTFExchangeOrderBuilder.BuildOrderHash(order, exchangeAddress)
+		if err2 != nil {
+			return nil, err2
+		}
+		signature, sigErr = signFn(order.Signer.String(), orderHash.Bytes())
+		if sigErr != nil {
+			return nil, sigErr
+		}
+	} else {
+		wrappedHash, err2 := cTFExchangeOrderBuilder.BuildPoly1271WrappedHash(order, exchangeAddress)
+		if err2 != nil {
+			return nil, err2
+		}
+		innerSig, innerSigErr := signFn(order.Signer.String(), wrappedHash.Bytes())
+		if innerSigErr != nil {
+			return nil, innerSigErr
+		}
+		signature, sigErr = cTFExchangeOrderBuilder.BuildPoly1271FinalSignature(order, exchangeAddress, innerSig)
+		if sigErr != nil {
+			return nil, sigErr
+		}
+	}
+
+	return &model.SignedOrderV2{
+		OrderV2:   *order,
+		Signature: signature,
+	}, nil
 }
 
 func (o *OrderBuilder) buildOrderCreationArgs(order types.UserOrder, orderType types.OrderType, roundConfig RoundConfig, option *sdktypes.AuthOption) *model.OrderData {

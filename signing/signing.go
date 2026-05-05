@@ -1,7 +1,6 @@
 package signing
 
 import (
-	"crypto/ecdsa"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -62,14 +61,7 @@ func BuildClobEip712Signature(signatureFunc SignatureFunc, chainId *big.Int, sin
 		return "", fmt.Errorf("TypedDataAndHash failed: %w", err)
 	}
 
-	sigBytes, err := signatureFunc(singer, func(key *ecdsa.PrivateKey) ([]byte, error) {
-		sig, err2 := crypto.Sign(hash, key)
-		if err2 != nil {
-			return nil, err2
-		}
-		sig[64] += 27
-		return sig, nil
-	})
+	sigBytes, err := signatureFunc(singer, hash)
 	if err != nil {
 		return "", fmt.Errorf("signature failed: %w", err)
 	}
@@ -109,14 +101,7 @@ func BuildSafeCreateTransactionEip712Signature(signatureFunc SignatureFunc, chai
 		return "", fmt.Errorf("build safe createTransaction TypedDataAndHash failed: %w", err)
 	}
 
-	sigBytes, err := signatureFunc(singer, func(key *ecdsa.PrivateKey) ([]byte, error) {
-		sig, err2 := crypto.Sign(hash, key)
-		if err2 != nil {
-			return nil, err2
-		}
-		sig[64] += 27
-		return sig, nil
-	})
+	sigBytes, err := signatureFunc(singer, hash)
 	if err != nil {
 		return "", fmt.Errorf("signature failed: %w", err)
 	}
@@ -185,14 +170,7 @@ func BuildSafeCreateSafeSignature(
 
 	prefixedHash := crypto.Keccak256Hash([]byte(fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(structHash), structHash)))
 
-	sigBytes, err := signatureFunc(from, func(key *ecdsa.PrivateKey) ([]byte, error) {
-		sig, err2 := crypto.Sign(prefixedHash.Bytes(), key)
-		if err2 != nil {
-			return nil, err2
-		}
-		sig[64] += 27
-		return sig, nil
-	})
+	sigBytes, err := signatureFunc(from, prefixedHash.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("signature failed: %w", err)
 	}
@@ -257,14 +235,7 @@ func BuildDepositWalletBatchSignature(
 		return "", fmt.Errorf("build deposit wallet batch TypedDataAndHash failed: %w", err)
 	}
 
-	sigBytes, err := signatureFunc(from, func(key *ecdsa.PrivateKey) ([]byte, error) {
-		sig, err2 := crypto.Sign(hash, key)
-		if err2 != nil {
-			return nil, err2
-		}
-		sig[64] += 27
-		return sig, nil
-	})
+	sigBytes, err := signatureFunc(from, hash)
 	if err != nil {
 		return "", fmt.Errorf("signature failed: %w", err)
 	}
