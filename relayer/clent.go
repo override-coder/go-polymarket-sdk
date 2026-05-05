@@ -467,44 +467,7 @@ func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.Relaye
 		To:   depositWalletConfig.DepositWalletFactory,
 	}
 
-	payloadBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("deploy deposit wallet: marshal request failed: %w", err)
-	}
-	body := string(payloadBytes)
-
-	builderApiKeyCreds := option.BuilderApiKeyCreds
-	if builderApiKeyCreds == nil {
-		builderApiKeyCreds = c.builderApiKeyCreds
-	}
-	headers, err := sdkheaders.CreateL2BuilderHeaders(
-		builderApiKeyCreds,
-		clobtypes.L2HeaderArgs{
-			Method:      http.MethodPost,
-			RequestPath: types.SUBMIT_TRANSACTION,
-			Body:        body,
-		},
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("deploy deposit wallet: create header failed: %w", err)
-	}
-
-	var out types.RelayerTransactionResponse
-	resp, err := c.client.DoRequest(
-		context.Background(),
-		http.MethodPost,
-		types.SUBMIT_TRANSACTION,
-		&http2.RequestOptions{
-			Headers: headers,
-			Data:    body,
-		},
-		&out,
-	)
-	if _, e := http2.ParseHTTPError(resp, err); e != nil {
-		return nil, e
-	}
-	return &out, nil
+	return c.submitTransaction(reqBody, option, "deploy deposit wallet")
 }
 
 func (c *Client) BuildDepositWalletBatch(
@@ -562,23 +525,45 @@ func (c *Client) ExecuteDepositWalletBatch(
 	deadline string,
 	option *sdktypes.AuthOption,
 ) (*types.RelayerTransactionResponse, error) {
+	if option == nil {
+		return nil, fmt.Errorf("execute deposit wallet batch: nil auth option")
+	}
+
 	reqBody, err := c.BuildDepositWalletBatch(calls, deadline, option)
 	if err != nil {
 		return nil, err
 	}
 
+	return c.submitTransaction(reqBody, option, "execute deposit wallet batch")
+}
+
+func (c *Client) ExecuteDepositWalletBatchByTx(
+	reqBody *types.DepositWalletBatchRequest,
+	option *sdktypes.AuthOption,
+) (*types.RelayerTransactionResponse, error) {
+	if option == nil {
+		return nil, fmt.Errorf("execute deposit wallet batch: nil auth option")
+	}
+	if reqBody == nil {
+		return nil, fmt.Errorf("execute deposit wallet batch: nil request body")
+	}
+
+	return c.submitTransaction(reqBody, option, "execute deposit wallet batch")
+}
+
+func (c *Client) submitTransaction(
+	reqBody any,
+	option *sdktypes.AuthOption,
+	action string,
+) (*types.RelayerTransactionResponse, error) {
 	payloadBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("execute deposit wallet batch: marshal request failed: %w", err)
+		return nil, fmt.Errorf("%s: marshal request failed: %w", action, err)
 	}
 	body := string(payloadBytes)
 
-	builderApiKeyCreds := option.BuilderApiKeyCreds
-	if builderApiKeyCreds == nil {
-		builderApiKeyCreds = c.builderApiKeyCreds
-	}
 	headers, err := sdkheaders.CreateL2BuilderHeaders(
-		builderApiKeyCreds,
+		c.resolveBuilderAPIKeyCreds(option),
 		clobtypes.L2HeaderArgs{
 			Method:      http.MethodPost,
 			RequestPath: types.SUBMIT_TRANSACTION,
@@ -587,7 +572,7 @@ func (c *Client) ExecuteDepositWalletBatch(
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("execute deposit wallet batch: create header failed: %w", err)
+		return nil, fmt.Errorf("%s: create header failed: %w", action, err)
 	}
 
 	var out types.RelayerTransactionResponse
@@ -607,59 +592,9 @@ func (c *Client) ExecuteDepositWalletBatch(
 	return &out, nil
 }
 
-func (c *Client) BuildDepositWalletDirectTx(
-	calls []types.DepositWalletCall,
-	nonceAt *big.Int,
-	deadline string,
-	option *sdktypes.AuthOption,
-) (*types.DepositWalletBatchRequest, error) {
-	if option == nil {
-		return nil, fmt.Errorf("build deposit wallet batch: nil auth option")
+func (c *Client) resolveBuilderAPIKeyCreds(option *sdktypes.AuthOption) *sdktypes.BuilderApiKeyCreds {
+	if option != nil && option.BuilderApiKeyCreds != nil {
+		return option.BuilderApiKeyCreds
 	}
-	from := option.SingerAddress
-	if from == "" {
-		return nil, fmt.Errorf("build deposit wallet batch: empty signer address")
-	}
-	walletAddress, err := c.GetExpectedDepositWallet(from)
-	if err != nil {
-		return nil, err
-	}
-	if walletAddress == "" {
-		return nil, fmt.Errorf("build deposit wallet batch: empty wallet address")
-	}
-	if len(calls) == 0 {
-		return nil, fmt.Errorf("build deposit wallet batch: no calls")
-	}
-
-	cfg := c.depositWalletContractConfig
-	if cfg == nil || cfg.DepositWalletFactory == "" || cfg.DepositWalletImplementation == "" {
-		return nil, fmt.Errorf("build deposit wallet batch: deposit wallet config unsupported on this chain")
-	}
-
-	nonce := big.NewInt(0).String()
-	if nonceAt == nil || nonceAt.Cmp(big.NewInt(0)) == 0 {
-		noncePayload, err := c.GetNonce(from, types.TransactionTypeWALLET)
-		if err != nil {
-			return nil, fmt.Errorf("build deposit wallet batch: GetNonce failed: %w", err)
-		}
-		nonce = noncePayload.Nonce
-	} else {
-		nonce = nonceAt.String()
-	}
-
-	args := types.DepositWalletTransactionArgs{
-		From:          from,
-		ChainID:       c.chainId.Int64(),
-		WalletAddress: walletAddress,
-		Nonce:         nonce,
-		Deadline:      deadline,
-		Calls:         calls,
-	}
-
-	reqBody, err := buildDepositWalletBatchRequest(c.signFn, args, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("build deposit wallet batch: build request failed: %w", err)
-	}
-
-	return reqBody, nil
+	return c.builderApiKeyCreds
 }
