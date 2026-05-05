@@ -79,6 +79,10 @@ func deriveSafe(ownerAddress string, safeFactory string) (string, error) {
 	return computedAddress.Hex(), nil
 }
 
+func DeriveDepositWallet(ownerAddress, factoryAddress, implementationAddress string) (string, error) {
+	return deriveDepositWallet(ownerAddress, factoryAddress, implementationAddress)
+}
+
 func deriveDepositWallet(ownerAddress, factoryAddress, implementationAddress string) (string, error) {
 	if !common.IsHexAddress(ownerAddress) {
 		return "", fmt.Errorf("deriveDepositWallet: invalid owner address: %s", ownerAddress)
