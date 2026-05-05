@@ -89,7 +89,7 @@ func (o *OrderBuilder) createOrderV2(order types.UserOrderV2, orderType types.Or
 	if options.NegRisk {
 		exchangeContract = model.NegRiskCTFExchange
 	}
-	return buildOrderV2(o.signFn, exchangeContract, o.chaindId, orderData)
+	return buildOrderV2(options.AuthOption.SingerAddress, o.signFn, exchangeContract, o.chaindId, orderData)
 }
 
 func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingContract, chainId *big.Int, orderData *model.OrderData) (*model.SignedOrder, error) {
@@ -112,7 +112,7 @@ func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingCon
 	}, nil
 }
 
-func buildOrderV2(signFn signing.SignatureFunc, exchangeAddress model.VerifyingContract, chainId *big.Int, orderData *model.OrderDataV2) (*model.SignedOrderV2, error) {
+func buildOrderV2(signer string, signFn signing.SignatureFunc, exchangeAddress model.VerifyingContract, chainId *big.Int, orderData *model.OrderDataV2) (*model.SignedOrderV2, error) {
 	cTFExchangeOrderBuilder := builder.NewExchangeOrderBuilderImplV2(chainId, nil)
 	order, err := cTFExchangeOrderBuilder.BuildOrder(orderData)
 	if err != nil {
@@ -125,7 +125,7 @@ func buildOrderV2(signFn signing.SignatureFunc, exchangeAddress model.VerifyingC
 		if err2 != nil {
 			return nil, err2
 		}
-		signature, sigErr = signFn(order.Signer.String(), orderHash.Bytes())
+		signature, sigErr = signFn(signer, orderHash.Bytes())
 		if sigErr != nil {
 			return nil, sigErr
 		}
@@ -134,7 +134,7 @@ func buildOrderV2(signFn signing.SignatureFunc, exchangeAddress model.VerifyingC
 		if err2 != nil {
 			return nil, err2
 		}
-		innerSig, innerSigErr := signFn(order.Signer.String(), wrappedHash.Bytes())
+		innerSig, innerSigErr := signFn(signer, wrappedHash.Bytes())
 		if innerSigErr != nil {
 			return nil, innerSigErr
 		}
