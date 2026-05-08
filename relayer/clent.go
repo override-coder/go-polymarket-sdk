@@ -15,6 +15,7 @@ import (
 	"github.com/override-coder/go-polymarket-sdk/relayer/types"
 	"github.com/override-coder/go-polymarket-sdk/signing"
 	sdktypes "github.com/override-coder/go-polymarket-sdk/types"
+	"github.com/override-coder/go-polymarket-sdk/types/utils"
 	"github.com/pkg/errors"
 )
 
@@ -473,6 +474,7 @@ func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.Relaye
 func (c *Client) BuildDepositWalletBatch(
 	calls []types.DepositWalletCall,
 	deadline string,
+	nonceAt *string,
 	option *sdktypes.AuthOption,
 ) (*types.DepositWalletBatchRequest, error) {
 	if option == nil {
@@ -498,16 +500,22 @@ func (c *Client) BuildDepositWalletBatch(
 		return nil, fmt.Errorf("build deposit wallet batch: deposit wallet config unsupported on this chain")
 	}
 
-	noncePayload, err := c.GetNonce(from, types.TransactionTypeWALLET)
-	if err != nil {
-		return nil, fmt.Errorf("build deposit wallet batch: GetNonce failed: %w", err)
+	nonce := big.NewInt(0).String()
+	if nonceAt == nil || utils.StringToDecimal(*nonceAt).BigInt().Cmp(big.NewInt(0)) == 0 {
+		noncePayload, err := c.GetNonce(from, types.TransactionTypeWALLET)
+		if err != nil {
+			return nil, fmt.Errorf("execute: GetNonce failed: %w", err)
+		}
+		nonce = noncePayload.Nonce
+	} else {
+		nonce = *nonceAt
 	}
 
 	args := types.DepositWalletTransactionArgs{
 		From:          from,
 		ChainID:       c.chainId.Int64(),
 		WalletAddress: walletAddress,
-		Nonce:         noncePayload.Nonce,
+		Nonce:         nonce,
 		Deadline:      deadline,
 		Calls:         calls,
 	}
@@ -529,7 +537,7 @@ func (c *Client) ExecuteDepositWalletBatch(
 		return nil, fmt.Errorf("execute deposit wallet batch: nil auth option")
 	}
 
-	reqBody, err := c.BuildDepositWalletBatch(calls, deadline, option)
+	reqBody, err := c.BuildDepositWalletBatch(calls, deadline, nil, option)
 	if err != nil {
 		return nil, err
 	}
