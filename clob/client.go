@@ -260,6 +260,17 @@ func (c *Client) GetMarketPrices(ctx context.Context, prices []types.PricesReque
 	return out, nil
 }
 
+func (c *Client) GetLastTradePrices(ctx context.Context, prices []types.LastTradePriceRequest) ([]types.LastTradePrice, error) {
+	var resp []types.LastTradePrice
+	res, err := c.client.DoRequest(ctx, http.MethodPost, types.GET_LAST_TRADES_PRICES, &http2.RequestOptions{
+		Data: prices,
+	}, &resp)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrap(e, "get last trade prices")
+	}
+	return resp, nil
+}
+
 func (c *Client) ensureMarketInfoCached(ctx context.Context, tokenID string, conditionId *string) error {
 	if c.hasFreshMarketInfoForToken(tokenID, conditionId) {
 		return nil

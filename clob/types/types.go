@@ -283,6 +283,17 @@ type PricesRequest struct {
 	Side    string `json:"side"`
 }
 
+type LastTradePriceRequest struct {
+	TokenId string `json:"token_id"`
+	Side    string `json:"side,omitempty"`
+}
+
+type LastTradePrice struct {
+	TokenId string `json:"token_id"`
+	Price   string `json:"price"`
+	Side    string `json:"side"`
+}
+
 type CancelOrderRequest struct {
 	ConditionID *string `json:"market"`
 	AssetID     *string `json:"asset_id"`
