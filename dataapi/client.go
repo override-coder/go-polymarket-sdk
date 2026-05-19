@@ -3,27 +3,40 @@ package dataapi
 import (
 	"context"
 	"fmt"
-	"github.com/override-coder/go-polymarket-sdk/dataapi/types"
-	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	"math/big"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/override-coder/go-polymarket-sdk/dataapi/types"
+	http2 "github.com/override-coder/go-polymarket-sdk/http"
 )
 
 type Client struct {
-	client *http2.Client
+	client     *http2.Client
+	clobClient *http2.Client
 
 	chainId *big.Int
 }
 
+const defaultClobHost = "https://clob.polymarket.com"
+
 func NewClient(host string, chainId *big.Int) *Client {
+	return NewClientWithClobHost(host, defaultClobHost, chainId)
+}
+
+func NewClientWithClobHost(host, clobHost string, chainId *big.Int) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
+	if strings.HasSuffix(clobHost, "/") {
+		clobHost = clobHost[:len(clobHost)-1]
+	}
 	return &Client{
-		client:  http2.NewClient(host),
-		chainId: chainId,
+		client:     http2.NewClient(host),
+		clobClient: http2.NewClient(clobHost),
+		chainId:    chainId,
 	}
 }
 
@@ -294,4 +307,62 @@ func (c *Client) GetTraderLeaderboardRankings(
 	}
 
 	return out, nil
+}
+
+func (c *Client) GetTopHoldersForMarkets(ctx context.Context, q types.TopHoldersQuery) ([]types.TopHoldersForMarket, error) {
+	if len(q.Market) == 0 {
+		return nil, fmt.Errorf("market is required")
+	}
+
+	re := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
+	for _, m := range q.Market {
+		if !re.MatchString(m) {
+			return nil, fmt.Errorf("invalid conditionId: %s (must be 0x + 64 hex chars)", m)
+		}
+	}
+
+	limit := 20
+	if q.Limit != nil {
+		if *q.Limit < 0 || *q.Limit > 20 {
+			return nil, fmt.Errorf("limit out of range (0..20)")
+		}
+		limit = *q.Limit
+	}
+
+	minBalance := 1
+	if q.MinBalance != nil {
+		if *q.MinBalance < 0 || *q.MinBalance > 999999 {
+			return nil, fmt.Errorf("minBalance out of range (0..999999)")
+		}
+		minBalance = *q.MinBalance
+	}
+
+	params := map[string]any{
+		"market":     strings.Join(q.Market, ","),
+		"limit":      limit,
+		"minBalance": minBalance,
+	}
+
+	var out []types.TopHoldersForMarket
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_HOLDERS, &http2.RequestOptions{
+		Params: params,
+	}, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return out, nil
+}
+
+func (c *Client) GetMarketByToken(ctx context.Context, tokenID string) (*types.MarketByTokenResponse, error) {
+	tokenID = strings.TrimSpace(tokenID)
+	if tokenID == "" {
+		return nil, fmt.Errorf("tokenID is required")
+	}
+
+	var out types.MarketByTokenResponse
+	resp, err := c.clobClient.DoRequest(ctx, http.MethodGet, types.GET_MARKET_BY_TOKEN+url.PathEscape(tokenID), nil, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return &out, nil
 }

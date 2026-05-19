@@ -189,3 +189,34 @@ type TraderLeaderboard struct {
 	PnL           float64 `json:"pnl"`
 	ProfileImage  string  `json:"profileImage"`
 }
+
+type TopHoldersQuery struct {
+	Market     []string // required: conditionIds (0x + 64 hex)
+	Limit      *int     // default: 20, range: 0..20
+	MinBalance *int     // default: 1, range: 0..999999
+}
+
+type TopHoldersForMarket struct {
+	Token   string      `json:"token"`
+	Holders []TopHolder `json:"holders"`
+}
+
+type TopHolder struct {
+	ProxyWallet           string  `json:"proxyWallet"`
+	Bio                   string  `json:"bio"`
+	Asset                 string  `json:"asset"`
+	Pseudonym             string  `json:"pseudonym"`
+	Amount                float64 `json:"amount"`
+	DisplayUsernamePublic bool    `json:"displayUsernamePublic"`
+	OutcomeIndex          int64   `json:"outcomeIndex"`
+	Name                  string  `json:"name"`
+	ProfileImage          string  `json:"profileImage"`
+	ProfileImageOptimized string  `json:"profileImageOptimized"`
+	Verified              bool    `json:"verified"`
+}
+
+type MarketByTokenResponse struct {
+	ConditionID      string `json:"condition_id"`
+	PrimaryTokenID   string `json:"primary_token_id"`
+	SecondaryTokenID string `json:"secondary_token_id"`
+}
