@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -197,8 +198,13 @@ func (c *Client) GetCLOBMarketInfo(ctx context.Context, conditionID string) (*ty
 }
 
 func (c *Client) GetMarketByToken(ctx context.Context, tokenID string) (*types.MarketByTokenResponse, error) {
+	tokenID = strings.TrimSpace(tokenID)
+	if tokenID == "" {
+		return nil, fmt.Errorf("tokenID is required")
+	}
+
 	var resp types.MarketByTokenResponse
-	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_MARKET_BY_TOKEN+tokenID, nil, &resp)
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_MARKET_BY_TOKEN+url.PathEscape(tokenID), nil, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
 		return nil, errors.Wrap(e, "get market by token")
 	}
