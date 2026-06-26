@@ -14,9 +14,13 @@ import (
 )
 
 var (
-	erc1967Const1 = common.FromHex("0xcc3735a920a3ca505d382bbc545af43d6000803e6038573d6000fd5b3d6000f3")
-	erc1967Const2 = common.FromHex("0x5155f3363d3d373d3d363d7f360894a13ba1a3210667c828492db98dca3e2076")
-	erc1967Prefix = mustBigInt("0x61003d3d8160233d3973")
+	erc1967Const1       = common.FromHex("0xcc3735a920a3ca505d382bbc545af43d6000803e6038573d6000fd5b3d6000f3")
+	erc1967Const2       = common.FromHex("0x5155f3363d3d373d3d363d7f360894a13ba1a3210667c828492db98dca3e2076")
+	erc1967Prefix       = mustBigInt("0x61003d3d8160233d3973")
+	erc1967BeaconConst1 = common.FromHex("0xb3582b35133d50545afa5036515af43d6000803e604d573d6000fd5b3d6000f3")
+	erc1967BeaconConst2 = common.FromHex("0x1b60e01b36527fa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6c")
+	erc1967BeaconConst3 = common.FromHex("0x60195155f3363d3d373d3d363d602036600436635c60da")
+	erc1967BeaconPrefix = mustBigInt("0x6100523d8160233d3973")
 )
 
 func buildSafeCreateTransactionRequest(
@@ -83,6 +87,10 @@ func DeriveDepositWallet(ownerAddress, factoryAddress, implementationAddress str
 	return deriveDepositWallet(ownerAddress, factoryAddress, implementationAddress)
 }
 
+func DeriveBeaconDepositWallet(ownerAddress, factoryAddress, beaconAddress string) (string, error) {
+	return deriveBeaconDepositWallet(ownerAddress, factoryAddress, beaconAddress)
+}
+
 func deriveDepositWallet(ownerAddress, factoryAddress, implementationAddress string) (string, error) {
 	if !common.IsHexAddress(ownerAddress) {
 		return "", fmt.Errorf("deriveDepositWallet: invalid owner address: %s", ownerAddress)
@@ -98,12 +106,7 @@ func deriveDepositWallet(ownerAddress, factoryAddress, implementationAddress str
 	factory := common.HexToAddress(factoryAddress)
 	implementation := common.HexToAddress(implementationAddress)
 
-	walletID := common.LeftPadBytes(owner.Bytes(), 32)
-
-	args, err := abi.Arguments{
-		{Type: mustABIType("address")},
-		{Type: mustABIType("bytes32")},
-	}.Pack(factory, [32]byte(walletID))
+	args, err := depositWalletArgs(owner, factory)
 	if err != nil {
 		return "", fmt.Errorf("deriveDepositWallet: abi pack args: %w", err)
 	}
@@ -116,6 +119,45 @@ func deriveDepositWallet(ownerAddress, factoryAddress, implementationAddress str
 
 	computed := crypto.CreateAddress2(factory, salt32, bytecodeHash)
 	return computed.Hex(), nil
+}
+
+func deriveBeaconDepositWallet(ownerAddress, factoryAddress, beaconAddress string) (string, error) {
+	if !common.IsHexAddress(ownerAddress) {
+		return "", fmt.Errorf("deriveBeaconDepositWallet: invalid owner address: %s", ownerAddress)
+	}
+	if !common.IsHexAddress(factoryAddress) {
+		return "", fmt.Errorf("deriveBeaconDepositWallet: invalid factory address: %s", factoryAddress)
+	}
+	if !common.IsHexAddress(beaconAddress) {
+		return "", fmt.Errorf("deriveBeaconDepositWallet: invalid beacon address: %s", beaconAddress)
+	}
+
+	owner := common.HexToAddress(ownerAddress)
+	factory := common.HexToAddress(factoryAddress)
+	beacon := common.HexToAddress(beaconAddress)
+
+	args, err := depositWalletArgs(owner, factory)
+	if err != nil {
+		return "", fmt.Errorf("deriveBeaconDepositWallet: abi pack args: %w", err)
+	}
+
+	salt := crypto.Keccak256(args)
+	bytecodeHash := initCodeHashERC1967Beacon(beacon, args)
+
+	var salt32 [32]byte
+	copy(salt32[:], salt)
+
+	computed := crypto.CreateAddress2(factory, salt32, bytecodeHash)
+	return computed.Hex(), nil
+}
+
+func depositWalletArgs(owner, factory common.Address) ([]byte, error) {
+	walletID := common.LeftPadBytes(owner.Bytes(), 32)
+
+	return abi.Arguments{
+		{Type: mustABIType("address")},
+		{Type: mustABIType("bytes32")},
+	}.Pack(factory, [32]byte(walletID))
 }
 
 func initCodeHashERC1967(implementation common.Address, args []byte) []byte {
@@ -131,6 +173,24 @@ func initCodeHashERC1967(implementation common.Address, args []byte) []byte {
 	initCode = append(initCode, 0x60, 0x09)
 	initCode = append(initCode, erc1967Const2...)
 	initCode = append(initCode, erc1967Const1...)
+	initCode = append(initCode, args...)
+
+	return crypto.Keccak256(initCode)
+}
+
+func initCodeHashERC1967Beacon(beacon common.Address, args []byte) []byte {
+	n := big.NewInt(int64(len(args)))
+	shiftedN := new(big.Int).Lsh(n, 56)
+	combined := new(big.Int).Add(new(big.Int).Set(erc1967BeaconPrefix), shiftedN)
+
+	prefixBytes := leftPadBigInt(combined, 10)
+
+	initCode := make([]byte, 0, 10+20+len(erc1967BeaconConst3)+len(erc1967BeaconConst2)+len(erc1967BeaconConst1)+len(args))
+	initCode = append(initCode, prefixBytes...)
+	initCode = append(initCode, beacon.Bytes()...)
+	initCode = append(initCode, erc1967BeaconConst3...)
+	initCode = append(initCode, erc1967BeaconConst2...)
+	initCode = append(initCode, erc1967BeaconConst1...)
 	initCode = append(initCode, args...)
 
 	return crypto.Keccak256(initCode)

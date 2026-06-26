@@ -22,6 +22,7 @@ func GetContractConfig(chainId *big.Int) *ContractConfig {
 type DepositWalletContractConfig struct {
 	DepositWalletFactory        string
 	DepositWalletImplementation string
+	DepositWalletBeacon         string
 }
 
 func GetDepositWalletContractConfig(chainId *big.Int) *DepositWalletContractConfig {
@@ -30,6 +31,7 @@ func GetDepositWalletContractConfig(chainId *big.Int) *DepositWalletContractConf
 		return &DepositWalletContractConfig{
 			DepositWalletFactory:        "0x00000000000Fb5C9ADea0298D729A0CB3823Cc07",
 			DepositWalletImplementation: "0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB",
+			DepositWalletBeacon:         "0x7A18EDfe055488A3128f01F563e5B479D92ffc3a",
 		}
 	default:
 		panic("invalid chain id")

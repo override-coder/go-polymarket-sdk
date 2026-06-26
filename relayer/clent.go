@@ -453,6 +453,22 @@ func (c *Client) GetExpectedDepositWallet(ownerAddr string) (string, error) {
 	return addr, nil
 }
 
+func (c *Client) GetExpectedBeaconDepositWallet(ownerAddr string) (string, error) {
+	cfg := c.depositWalletContractConfig
+	if cfg.DepositWalletFactory == "" || cfg.DepositWalletBeacon == "" {
+		return "", fmt.Errorf("beacon deposit wallet config unsupported on this chain")
+	}
+	addr, err := deriveBeaconDepositWallet(
+		ownerAddr,
+		cfg.DepositWalletFactory,
+		cfg.DepositWalletBeacon,
+	)
+	if err != nil {
+		return "", fmt.Errorf("getExpectedBeaconDepositWallet: %w", err)
+	}
+	return addr, nil
+}
+
 func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
 	if option == nil {
 		return nil, fmt.Errorf("deploy deposit wallet: nil auth option")
@@ -475,6 +491,7 @@ func (c *Client) BuildDepositWalletBatch(
 	calls []types.DepositWalletCall,
 	deadline string,
 	nonceAt *string,
+	useBeaconDepositWallet *bool,
 	option *sdktypes.AuthOption,
 ) (*types.DepositWalletBatchRequest, error) {
 	if option == nil {
@@ -484,7 +501,7 @@ func (c *Client) BuildDepositWalletBatch(
 	if from == "" {
 		return nil, fmt.Errorf("build deposit wallet batch: empty signer address")
 	}
-	walletAddress, err := c.GetExpectedDepositWallet(from)
+	walletAddress, err := c.getExpectedDepositWallet(from, useBeaconDepositWallet)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +513,7 @@ func (c *Client) BuildDepositWalletBatch(
 	}
 
 	cfg := c.depositWalletContractConfig
-	if cfg == nil || cfg.DepositWalletFactory == "" || cfg.DepositWalletImplementation == "" {
+	if cfg == nil || cfg.DepositWalletFactory == "" {
 		return nil, fmt.Errorf("build deposit wallet batch: deposit wallet config unsupported on this chain")
 	}
 
@@ -528,16 +545,24 @@ func (c *Client) BuildDepositWalletBatch(
 	return reqBody, nil
 }
 
+func (c *Client) getExpectedDepositWallet(ownerAddr string, useBeaconDepositWallet *bool) (string, error) {
+	if useBeaconDepositWallet != nil && *useBeaconDepositWallet {
+		return c.GetExpectedBeaconDepositWallet(ownerAddr)
+	}
+	return c.GetExpectedDepositWallet(ownerAddr)
+}
+
 func (c *Client) ExecuteDepositWalletBatch(
 	calls []types.DepositWalletCall,
 	deadline string,
+	useBeaconDepositWallet *bool,
 	option *sdktypes.AuthOption,
 ) (*types.RelayerTransactionResponse, error) {
 	if option == nil {
 		return nil, fmt.Errorf("execute deposit wallet batch: nil auth option")
 	}
 
-	reqBody, err := c.BuildDepositWalletBatch(calls, deadline, nil, option)
+	reqBody, err := c.BuildDepositWalletBatch(calls, deadline, nil, useBeaconDepositWallet, option)
 	if err != nil {
 		return nil, err
 	}
