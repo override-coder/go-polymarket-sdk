@@ -75,7 +75,7 @@ func (o *OrderBuilder) buildOrderV2(order types.UserOrderV2, orderType types.Ord
 }
 
 func (o *OrderBuilder) createOrder(order types.UserOrder, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrder, error) {
-	orderData := o.buildOrderCreationArgs(order, orderType, roundingConfig[options.TickSize], options.AuthOption)
+	orderData := o.buildOrderCreationArgs(order, orderType, roundConfigForTickSize(options.TickSize), options.AuthOption)
 	exchangeContract := model.CTFExchange
 	if options.NegRisk {
 		exchangeContract = model.NegRiskCTFExchange
@@ -84,12 +84,20 @@ func (o *OrderBuilder) createOrder(order types.UserOrder, orderType types.OrderT
 }
 
 func (o *OrderBuilder) createOrderV2(order types.UserOrderV2, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrderV2, error) {
-	orderData := o.buildOrderCreationArgsV2(order, orderType, roundingConfig[options.TickSize], options.AuthOption)
+	orderData := o.buildOrderCreationArgsV2(order, orderType, roundConfigForTickSize(options.TickSize), options.AuthOption)
 	exchangeContract := model.CTFExchange
 	if options.NegRisk {
 		exchangeContract = model.NegRiskCTFExchange
 	}
 	return buildOrderV2(options.AuthOption.SingerAddress, o.signFn, exchangeContract, o.chaindId, orderData)
+}
+
+func roundConfigForTickSize(tickSize types.TickSize) RoundConfig {
+	config, ok := roundingConfig[tickSize]
+	if !ok {
+		return roundingConfig[types.TickSize001]
+	}
+	return config
 }
 
 func buildOrder(signFn signing.SignatureFunc, exchangeAddress model.VerifyingContract, chainId *big.Int, orderData *model.OrderData) (*model.SignedOrder, error) {
