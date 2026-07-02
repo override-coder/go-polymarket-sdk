@@ -175,6 +175,8 @@ type TickSize string
 const (
 	TickSize01    TickSize = "0.1"
 	TickSize001   TickSize = "0.01"
+	TickSize005   TickSize = "0.005"
+	TickSize0025  TickSize = "0.0025"
 	TickSize0001  TickSize = "0.001"
 	TickSize00001 TickSize = "0.0001"
 )

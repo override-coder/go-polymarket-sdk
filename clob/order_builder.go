@@ -34,6 +34,16 @@ var roundingConfig = map[types.TickSize]RoundConfig{
 		Size:   2,
 		Amount: 4,
 	},
+	types.TickSize005: {
+		Price:  3,
+		Size:   2,
+		Amount: 5,
+	},
+	types.TickSize0025: {
+		Price:  4,
+		Size:   2,
+		Amount: 6,
+	},
 	types.TickSize0001: {
 		Price:  3,
 		Size:   2,
