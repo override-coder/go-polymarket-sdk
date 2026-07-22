@@ -165,6 +165,7 @@ type OrderResponse struct {
 	ErrorMsg           string   `json:"errorMsg"`
 	OrderID            string   `json:"orderID"`
 	TransactionsHashes []string `json:"transactionsHashes"`
+	TradeIDs           []string `json:"tradeIDs"`
 	Status             string   `json:"status"`
 	TakingAmount       string   `json:"takingAmount"`
 	MakingAmount       string   `json:"makingAmount"`

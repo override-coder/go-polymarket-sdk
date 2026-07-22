@@ -52,6 +52,8 @@ type Client struct {
 	conditionTokenMap         map[string][]string
 	marketInfoSingleflight    singleflight.Group
 	marketByTokenSingleflight singleflight.Group
+	resolveTradesTimeout      time.Duration
+	resolveTradesPollInterval time.Duration
 }
 
 func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, builderApiKeyCreds *sdktypes.BuilderApiKeyCreds) *Client {
@@ -59,23 +61,25 @@ func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, buil
 		host = host[:len(host)-1]
 	}
 	return &Client{
-		client:                   http2.NewClient(host),
-		chainId:                  chainId,
-		builderApiKeyCreds:       builderApiKeyCreds,
-		orderBuilder:             NewOrderBuilder(chainId, signFn),
-		signFn:                   signFn,
-		tickSizes:                make(types.TickSizes, 500),
-		negRisk:                  make(types.NegRisks, 500),
-		feeRates:                 make(types.FeeRates, 500),
-		feeInfos:                 make(types.FeeInfos, 500),
-		tokenConditionMap:        make(map[string]string, 500),
-		marketInfoCacheTTL:       defaultMarketInfoCacheTTL,
-		marketInfoCacheIdleTTL:   defaultMarketInfoCacheIdleTTL,
-		marketInfoCachedAt:       make(map[string]time.Time, 500),
-		marketInfoLastUsedAt:     make(map[string]time.Time, 500),
-		tokenConditionCachedAt:   make(map[string]time.Time, 500),
-		tokenConditionLastUsedAt: make(map[string]time.Time, 500),
-		conditionTokenMap:        make(map[string][]string, 500),
+		client:                    http2.NewClient(host),
+		chainId:                   chainId,
+		builderApiKeyCreds:        builderApiKeyCreds,
+		orderBuilder:              NewOrderBuilder(chainId, signFn),
+		signFn:                    signFn,
+		tickSizes:                 make(types.TickSizes, 500),
+		negRisk:                   make(types.NegRisks, 500),
+		feeRates:                  make(types.FeeRates, 500),
+		feeInfos:                  make(types.FeeInfos, 500),
+		tokenConditionMap:         make(map[string]string, 500),
+		marketInfoCacheTTL:        defaultMarketInfoCacheTTL,
+		marketInfoCacheIdleTTL:    defaultMarketInfoCacheIdleTTL,
+		marketInfoCachedAt:        make(map[string]time.Time, 500),
+		marketInfoLastUsedAt:      make(map[string]time.Time, 500),
+		tokenConditionCachedAt:    make(map[string]time.Time, 500),
+		tokenConditionLastUsedAt:  make(map[string]time.Time, 500),
+		conditionTokenMap:         make(map[string][]string, 500),
+		resolveTradesTimeout:      defaultResolveTradesTimeout,
+		resolveTradesPollInterval: defaultResolveTradesPollInterval,
 	}
 }
 

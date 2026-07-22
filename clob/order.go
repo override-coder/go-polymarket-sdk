@@ -114,6 +114,9 @@ func (c *Client) postOrder(ctx context.Context, order *model.SignedOrder, orderT
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
+	if !deferExec {
+		c.resolveTransactionsHashes(ctx, &out, option)
+	}
 	return &out, nil
 }
 
