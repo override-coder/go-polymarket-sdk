@@ -48,6 +48,10 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 			tickSizeFloat64,
 			1-tickSizeFloat64,
 		)
+
+		if err = validateAdjustedLimitBuyUSDCBalance(userOrder, orderType, normalizedPrice); err != nil {
+			return nil, err
+		}
 	}
 
 	userOrder.Price = normalizedPrice
@@ -76,6 +80,22 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 
 	return c.postOrderV2(ctx, signedOrder, orderType, postOnly, deferExec, option)
 
+}
+
+func validateAdjustedLimitBuyUSDCBalance(userOrder *types.UserOrderV2, orderType types.OrderType, normalizedPrice float64) error {
+	if userOrder.Price == normalizedPrice || userOrder.Side != types.BUY || userOrder.UserUsdcBalance == nil {
+		return nil
+	}
+	if orderType != types.OrderTypeGTC && orderType != types.OrderTypeGTD {
+		return nil
+	}
+
+	cost := utils.Float64ToDecimal(normalizedPrice).Mul(utils.Float64ToDecimal(userOrder.Size))
+	budget := utils.Float64ToDecimal(*userOrder.UserUsdcBalance)
+	if cost.GreaterThan(budget) {
+		return fmt.Errorf("limit buy cost %s exceeds user USDC balance %s after price normalization", cost, budget)
+	}
+	return nil
 }
 
 func (c *Client) postOrderV2(ctx context.Context, order *model.SignedOrderV2, orderType types.OrderType, postOnly, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
