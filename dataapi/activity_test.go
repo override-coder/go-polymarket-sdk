@@ -88,8 +88,8 @@ func TestGetUserActivityAllParameters(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, activities, 1)
-	require.Equal(t, types.ActivityTRADE, activities[0].Type)
-	require.Equal(t, types.SideSELL, activities[0].Side)
+	require.Equal(t, "TRADE", activities[0].Type)
+	require.Equal(t, "SELL", activities[0].Side)
 	require.True(t, activities[0].IsCombo)
 }
 
