@@ -208,32 +208,43 @@ func (c *Client) GetClosedPositions(ctx context.Context, q types.ClosedPositions
 }
 
 func (c *Client) GetUserActivity(ctx context.Context, q types.ActivityQuery) ([]types.UserActivity, error) {
-	if strings.TrimSpace(q.User) == "" {
+	user := strings.TrimSpace(q.User)
+	if user == "" {
 		return nil, fmt.Errorf("user is required")
+	}
+	if !regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`).MatchString(user) {
+		return nil, fmt.Errorf("invalid user address: %s", q.User)
 	}
 	if len(q.Market) > 0 && len(q.EventID) > 0 {
 		return nil, fmt.Errorf("market and eventId are mutually exclusive")
 	}
 
-	if len(q.Market) > 0 {
-		re := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
-		for _, m := range q.Market {
-			if !re.MatchString(m) {
-				return nil, fmt.Errorf("invalid conditionId: %s (must be 0x + 64 hex)", m)
-			}
+	conditionIDPattern := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
+	for _, market := range q.Market {
+		if !conditionIDPattern.MatchString(market) {
+			return nil, fmt.Errorf("invalid conditionId: %s (must be 0x + 64 hex chars)", market)
 		}
 	}
+	for _, eventID := range q.EventID {
+		if eventID < 1 {
+			return nil, fmt.Errorf("eventId must be >= 1")
+		}
+	}
+
 	limit := 100
 	if q.Limit != nil {
 		if *q.Limit < 0 {
-			return nil, fmt.Errorf("limit out of range (0..500)")
+			return nil, fmt.Errorf("limit must be >= 0")
 		}
 		limit = *q.Limit
+		if limit > 500 {
+			limit = 500
+		}
 	}
 	offset := 0
 	if q.Offset != nil {
-		if *q.Offset < 0 || *q.Offset > 3000 {
-			return nil, fmt.Errorf("offset out of range (0..3000)")
+		if *q.Offset < 0 || *q.Offset > 5000 {
+			return nil, fmt.Errorf("offset out of range (0..5000)")
 		}
 		offset = *q.Offset
 	}
@@ -252,13 +263,18 @@ func (c *Client) GetUserActivity(ctx context.Context, q types.ActivityQuery) ([]
 		return nil, fmt.Errorf("end must be >= 0")
 	}
 
-	// -- query params --
+	excludeDepositsWithdrawals := true
+	if q.ExcludeDepositsWithdrawals != nil {
+		excludeDepositsWithdrawals = *q.ExcludeDepositsWithdrawals
+	}
+
 	params := map[string]any{
-		"user":          q.User,
-		"limit":         limit,
-		"offset":        offset,
-		"sortBy":        string(sortBy),
-		"sortDirection": string(sortDir),
+		"user":                       user,
+		"limit":                      limit,
+		"offset":                     offset,
+		"sortBy":                     string(sortBy),
+		"sortDirection":              string(sortDir),
+		"excludeDepositsWithdrawals": excludeDepositsWithdrawals,
 	}
 	if len(q.Market) > 0 {
 		params["market"] = strings.Join(q.Market, ",")

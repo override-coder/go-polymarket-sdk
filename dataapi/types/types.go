@@ -107,12 +107,18 @@ type ClosedPosition struct {
 type ActivityType string
 
 const (
-	ActivityTRADE      ActivityType = "TRADE"
-	ActivitySPLIT      ActivityType = "SPLIT"
-	ActivityMERGE      ActivityType = "MERGE"
-	ActivityREDEEM     ActivityType = "REDEEM"
-	ActivityREWARD     ActivityType = "REWARD"
-	ActivityCONVERSION ActivityType = "CONVERSION"
+	ActivityTRADE          ActivityType = "TRADE"
+	ActivitySPLIT          ActivityType = "SPLIT"
+	ActivityMERGE          ActivityType = "MERGE"
+	ActivityREDEEM         ActivityType = "REDEEM"
+	ActivityREWARD         ActivityType = "REWARD"
+	ActivityCONVERSION     ActivityType = "CONVERSION"
+	ActivityDEPOSIT        ActivityType = "DEPOSIT"
+	ActivityWITHDRAWAL     ActivityType = "WITHDRAWAL"
+	ActivityYIELD          ActivityType = "YIELD"
+	ActivityMAKERREBATE    ActivityType = "MAKER_REBATE"
+	ActivityTAKERREBATE    ActivityType = "TAKER_REBATE"
+	ActivityREFERRALREWARD ActivityType = "REFERRAL_REWARD"
 )
 
 type ActivitySortBy string
@@ -131,41 +137,43 @@ const (
 )
 
 type ActivityQuery struct {
-	User          string          // required: 0x + 40 hex
-	Limit         *int            // default 100, range 0..500
-	Offset        *int            // default 0,   range 0..10000
-	Market        []string        // conditionIds (0x + 64 hex), mutually exclusive with EventID
-	EventID       []int64         // mutually exclusive with Market
-	Type          []ActivityType  //
-	Start         *int64          // >= 0 (unix seconds)
-	End           *int64          // >= 0
-	SortBy        *ActivitySortBy // default: TIMESTAMP
-	SortDirection *SortDirection  // default: DESC
-	Side          *Side           // BUY / SELL
+	User                       string          // required: 0x + 40 hex
+	Limit                      *int            // default 100, range 0..500
+	Offset                     *int            // default: 0, range: 0..5000
+	Market                     []string        // conditionIds (0x + 64 hex), mutually exclusive with EventID
+	EventID                    []int64         // mutually exclusive with Market
+	Type                       []ActivityType  // activity types to include
+	ExcludeDepositsWithdrawals *bool           // default: true; set false to include DEPOSIT/WITHDRAWAL
+	Start                      *int64          // >= 0 (unix seconds)
+	End                        *int64          // >= 0
+	SortBy                     *ActivitySortBy // default: TIMESTAMP
+	SortDirection              *SortDirection  // default: DESC
+	Side                       *Side           // BUY / SELL
 }
 
 type UserActivity struct {
-	ProxyWallet           string  `json:"proxyWallet"`
-	Timestamp             int64   `json:"timestamp"`
-	ConditionID           string  `json:"conditionId"`
-	Type                  string  `json:"type"` // TRADE/SPLIT/MERGE/REDEEM/REWARD/CONVERSION
-	Size                  float64 `json:"size"`
-	USDCSize              float64 `json:"usdcSize"`
-	TransactionHash       string  `json:"transactionHash"`
-	Price                 float64 `json:"price"`
-	Asset                 string  `json:"asset"`
-	Side                  string  `json:"side"` // BUY/SELL
-	OutcomeIndex          int64   `json:"outcomeIndex"`
-	Title                 string  `json:"title"`
-	Slug                  string  `json:"slug"`
-	Icon                  string  `json:"icon"`
-	EventSlug             string  `json:"eventSlug"`
-	Outcome               string  `json:"outcome"`
-	Name                  string  `json:"name"`
-	Pseudonym             string  `json:"pseudonym"`
-	Bio                   string  `json:"bio"`
-	ProfileImage          string  `json:"profileImage"`
-	ProfileImageOptimized string  `json:"profileImageOptimized"`
+	ProxyWallet           string       `json:"proxyWallet"`
+	Timestamp             int64        `json:"timestamp"`
+	ConditionID           string       `json:"conditionId"`
+	Type                  ActivityType `json:"type"`
+	Size                  float64      `json:"size"`
+	USDCSize              float64      `json:"usdcSize"`
+	TransactionHash       string       `json:"transactionHash"`
+	Price                 float64      `json:"price"`
+	Asset                 string       `json:"asset"`
+	Side                  Side         `json:"side"`
+	OutcomeIndex          int64        `json:"outcomeIndex"`
+	Title                 string       `json:"title"`
+	Slug                  string       `json:"slug"`
+	Icon                  string       `json:"icon"`
+	EventSlug             string       `json:"eventSlug"`
+	Outcome               string       `json:"outcome"`
+	Name                  string       `json:"name"`
+	Pseudonym             string       `json:"pseudonym"`
+	Bio                   string       `json:"bio"`
+	ProfileImage          string       `json:"profileImage"`
+	ProfileImageOptimized string       `json:"profileImageOptimized"`
+	IsCombo               bool         `json:"isCombo"`
 }
 
 type PositionValueQuery struct {
