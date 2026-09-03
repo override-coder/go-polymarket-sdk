@@ -63,6 +63,47 @@ type Position struct {
 	NegativeRisk       bool    `json:"negativeRisk"`
 }
 
+type ClosedPositionSortBy string
+
+const (
+	ClosedPositionSortByREALIZEDPNL ClosedPositionSortBy = "REALIZEDPNL"
+	ClosedPositionSortByTITLE       ClosedPositionSortBy = "TITLE"
+	ClosedPositionSortByPRICE       ClosedPositionSortBy = "PRICE"
+	ClosedPositionSortByAVGPRICE    ClosedPositionSortBy = "AVGPRICE"
+	ClosedPositionSortByTIMESTAMP   ClosedPositionSortBy = "TIMESTAMP"
+)
+
+type ClosedPositionsQuery struct {
+	User          string                // required: 0x + 40 hex
+	Market        []string              // conditionIds (0x + 64 hex), mutually exclusive with EventID
+	Title         *string               // optional, max len 100
+	EventID       []int64               // values >= 1, mutually exclusive with Market
+	Limit         *int                  // default: 10, range: 0..50
+	Offset        *int                  // default: 0, range: 0..100000
+	SortBy        *ClosedPositionSortBy // SDK default: TIMESTAMP
+	SortDirection *SortDirection        // default: DESC
+}
+
+type ClosedPosition struct {
+	ProxyWallet     string  `json:"proxyWallet"`
+	Asset           string  `json:"asset"`
+	ConditionID     string  `json:"conditionId"`
+	AvgPrice        float64 `json:"avgPrice"`
+	TotalBought     float64 `json:"totalBought"`
+	RealizedPnl     float64 `json:"realizedPnl"`
+	CurPrice        float64 `json:"curPrice"`
+	Timestamp       int64   `json:"timestamp"`
+	Title           string  `json:"title"`
+	Slug            string  `json:"slug"`
+	Icon            string  `json:"icon"`
+	EventSlug       string  `json:"eventSlug"`
+	Outcome         string  `json:"outcome"`
+	OutcomeIndex    int64   `json:"outcomeIndex"`
+	OppositeOutcome string  `json:"oppositeOutcome"`
+	OppositeAsset   string  `json:"oppositeAsset"`
+	EndDate         string  `json:"endDate"`
+}
+
 type ActivityType string
 
 const (
