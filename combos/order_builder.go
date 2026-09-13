@@ -84,6 +84,22 @@ type BuildQuoteRequestInput struct {
 	Builder       string
 }
 
+// BuildTakerOrderInput contains the exact amounts returned by RFQ_QUOTE_READY.
+// They must not be recomputed from a displayed price: the gateway quote is the
+// source of truth for the taker order.
+type BuildTakerOrderInput struct {
+	TokenID       string
+	MakerAmountE6 string
+	TakerAmountE6 string
+	Direction     combostypes.Direction
+	// Timestamp is expressed in Unix seconds when supplied. Builder Gateway's
+	// documented REST flow requires seconds; zero preserves requester WS's
+	// existing millisecond behavior.
+	Timestamp int64
+	Metadata  string
+	Builder   string
+}
+
 func (b *OrderBuilder) BuildQuoteRequest(input BuildQuoteRequestInput, option *sdktypes.AuthOption) (*combostypes.QuoteRequest, error) {
 	if option == nil {
 		return nil, fmt.Errorf("auth option is required")
@@ -177,6 +193,78 @@ func (b *OrderBuilder) BuildQuoteRequest(input BuildQuoteRequestInput, option *s
 		SignedOrder:   orderToJSON(signedOrder),
 		ValidUntil:    input.ValidUntil,
 	}, nil
+}
+
+// BuildTakerOrder creates the order accepted through the requester RFQ
+// gateway. Unlike a maker quote, its amounts come directly from the selected
+// quote and its side follows the requester's direction.
+func (b *OrderBuilder) BuildTakerOrder(input BuildTakerOrderInput, option *sdktypes.AuthOption) (combostypes.SignedOrderV2, error) {
+	if option == nil {
+		return combostypes.SignedOrderV2{}, fmt.Errorf("auth option is required")
+	}
+	if b.signFn == nil {
+		return combostypes.SignedOrderV2{}, fmt.Errorf("signature function is required")
+	}
+	if strings.TrimSpace(input.TokenID) == "" {
+		return combostypes.SignedOrderV2{}, fmt.Errorf("token id is required")
+	}
+	if _, err := parsePositiveE6(input.MakerAmountE6, "maker_amount_e6"); err != nil {
+		return combostypes.SignedOrderV2{}, err
+	}
+	if _, err := parsePositiveE6(input.TakerAmountE6, "taker_amount_e6"); err != nil {
+		return combostypes.SignedOrderV2{}, err
+	}
+	if option.SingerAddress == "" {
+		return combostypes.SignedOrderV2{}, fmt.Errorf("signer address is required")
+	}
+
+	maker := option.SingerAddress
+	if option.FunderAddress != "" {
+		maker = option.FunderAddress
+	}
+	signer := comboRFQSigner(option.SignatureType, option.SingerAddress, maker)
+
+	var side model.Side
+	switch input.Direction {
+	case combostypes.DirectionBuy:
+		side = model.BUY
+	case combostypes.DirectionSell:
+		side = model.SELL
+	default:
+		return combostypes.SignedOrderV2{}, fmt.Errorf("unsupported direction: %s", input.Direction)
+	}
+
+	metadata := input.Metadata
+	if metadata == "" {
+		metadata = combostypes.Bytes32Zero
+	}
+	builderCode := input.Builder
+	if builderCode == "" {
+		builderCode = combostypes.Bytes32Zero
+	}
+
+	timestamp := input.Timestamp
+	if timestamp == 0 {
+		timestamp = time.Now().UnixMilli()
+	}
+
+	signedOrder, err := b.buildComboSignedOrder(option.SingerAddress, &model.OrderDataV2{
+		Maker:         maker,
+		Signer:        signer,
+		TokenID:       input.TokenID,
+		MakerAmount:   input.MakerAmountE6,
+		TakerAmount:   input.TakerAmountE6,
+		Side:          side,
+		SignatureType: option.SignatureType,
+		Timestamp:     fmt.Sprintf("%d", timestamp),
+		Expiration:    "0",
+		Metadata:      metadata,
+		Builder:       builderCode,
+	})
+	if err != nil {
+		return combostypes.SignedOrderV2{}, err
+	}
+	return orderToJSON(signedOrder), nil
 }
 
 func comboRFQSigner(signatureType model.SignatureType, signer, maker string) string {
@@ -424,10 +512,6 @@ func mulDivCeil(a, b, d *big.Int) *big.Int {
 }
 
 func orderToJSON(order *model.SignedOrderV2) combostypes.SignedOrderV2 {
-	expiration := order.Expiration.String()
-	if expiration == "0" {
-		expiration = ""
-	}
 	return combostypes.SignedOrderV2{
 		Salt:          order.Salt.String(),
 		Maker:         order.Maker.String(),
@@ -438,7 +522,7 @@ func orderToJSON(order *model.SignedOrderV2) combostypes.SignedOrderV2 {
 		Side:          int(order.Side.Int64()),
 		SignatureType: model.SignatureType(order.SignatureType.Uint64()),
 		Timestamp:     order.Timestamp.String(),
-		Expiration:    expiration,
+		Expiration:    order.Expiration.String(),
 		Metadata:      order.Metadata.String(),
 		Builder:       order.Builder.String(),
 		Signature:     "0x" + common.Bytes2Hex(order.Signature),

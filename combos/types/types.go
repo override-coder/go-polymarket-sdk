@@ -17,6 +17,7 @@ type ComboSide string
 
 const (
 	ComboSideYes ComboSide = "YES"
+	ComboSideNo  ComboSide = "NO"
 )
 
 type QuoteSource string
@@ -47,6 +48,10 @@ const (
 	MessageTypeAckRFQConfirmationResponse MessageType = "ACK_RFQ_CONFIRMATION_RESPONSE"
 	MessageTypeRFQExecutionUpdate         MessageType = "RFQ_EXECUTION_UPDATE"
 	MessageTypeRFQError                   MessageType = "RFQ_ERROR"
+	MessageTypeRFQCreate                  MessageType = "RFQ_CREATE"
+	MessageTypeRFQQuoteReady              MessageType = "RFQ_QUOTE_READY"
+	MessageTypeRFQAccept                  MessageType = "RFQ_ACCEPT"
+	MessageTypeRFQStatusUpdate            MessageType = "RFQ_STATUS_UPDATE"
 )
 
 type AuthMessage struct {
@@ -115,6 +120,120 @@ type RFQRequest struct {
 	Side               ComboSide     `json:"side"`
 	RequestedSize      RequestedSize `json:"requested_size"`
 	SubmissionDeadline int64         `json:"submission_deadline"`
+}
+
+// TakerRFQRequest is the request payload returned by the requester gateway
+// alongside a priced quote.
+type TakerRFQRequest struct {
+	RFQID          string    `json:"rfq_id"`
+	LegPositionIDs []string  `json:"leg_position_ids"`
+	YesPositionID  string    `json:"yes_position_id"`
+	NoPositionID   string    `json:"no_position_id"`
+	Direction      Direction `json:"direction"`
+	Side           ComboSide `json:"side"`
+}
+
+type TakerQuote struct {
+	QuoteID       string `json:"quote_id"`
+	MakerAmountE6 string `json:"maker_amount_e6"`
+	TakerAmountE6 string `json:"taker_amount_e6"`
+}
+
+type TakerQuoteRequest struct {
+	Type           MessageType   `json:"type"`
+	LegPositionIDs []string      `json:"leg_position_ids"`
+	Direction      Direction     `json:"direction"`
+	Side           ComboSide     `json:"side"`
+	RequestedSize  RequestedSize `json:"requested_size"`
+}
+
+type TakerQuoteReady struct {
+	Type    MessageType     `json:"type"`
+	Request TakerRFQRequest `json:"request"`
+	Quote   TakerQuote      `json:"quote"`
+}
+
+type TakerAcceptRequest struct {
+	Type        MessageType   `json:"type"`
+	RFQID       string        `json:"rfq_id"`
+	QuoteID     string        `json:"quote_id"`
+	SignedOrder SignedOrderV2 `json:"signed_order"`
+}
+
+// BuilderTakerRequest is the documented Builder Gateway RFQ create payload.
+// The gateway currently supports only the YES combo side.
+type BuilderTakerRequest struct {
+	SignerAddress  string              `json:"signer_address"`
+	MakerAddress   string              `json:"maker_address"`
+	SignatureType  model.SignatureType `json:"signature_type"`
+	LegPositionIDs []string            `json:"leg_position_ids"`
+	Direction      Direction           `json:"direction"`
+	Side           ComboSide           `json:"side"`
+	RequestedSize  RequestedSize       `json:"requested_size"`
+}
+
+// BuilderTakerRFQRequest is the request snapshot returned by Builder Gateway.
+type BuilderTakerRFQRequest struct {
+	RFQID             string        `json:"rfq_id"`
+	MakerAddress      string        `json:"maker_address"`
+	RequestorPublicID string        `json:"requestor_public_id"`
+	LegPositionIDs    []string      `json:"leg_position_ids"`
+	ConditionID       string        `json:"condition_id"`
+	YesPositionID     string        `json:"yes_position_id"`
+	NoPositionID      string        `json:"no_position_id"`
+	Direction         Direction     `json:"direction"`
+	Side              ComboSide     `json:"side"`
+	RequestedSize     RequestedSize `json:"requested_size"`
+	CreatedAt         int64         `json:"created_at"`
+}
+
+type BuilderTakerQuote struct {
+	QuoteID         string `json:"quote_id"`
+	BlendedPriceE6  string `json:"blended_price_e6"`
+	MakerAmountE6   string `json:"maker_amount_e6"`
+	TakerAmountE6   string `json:"taker_amount_e6"`
+	TotalRequiredE6 string `json:"total_required_e6"`
+	NetReceiveE6    string `json:"net_receive_e6"`
+}
+
+type BuilderTakerError struct {
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+// BuilderTakerRFQ is returned by Builder Gateway after quote collection.
+// Quote is nil for terminal business outcomes such as no executable quote.
+type BuilderTakerRFQ struct {
+	RFQID       string                 `json:"rfq_id"`
+	Status      string                 `json:"status"`
+	ExpiresAt   int64                  `json:"expires_at,omitempty"`
+	BuilderCode string                 `json:"builder_code,omitempty"`
+	Request     BuilderTakerRFQRequest `json:"request"`
+	Quote       *BuilderTakerQuote     `json:"quote,omitempty"`
+	Error       *BuilderTakerError     `json:"error,omitempty"`
+}
+
+type BuilderTakerAcceptRequest struct {
+	QuoteID     string        `json:"quote_id"`
+	SignedOrder SignedOrderV2 `json:"signed_order"`
+}
+
+// BuilderTakerStatus is the durable state returned after an accepted RFQ.
+type BuilderTakerStatus struct {
+	RFQID          string             `json:"rfq_id"`
+	Status         string             `json:"status"`
+	TakerOrderHash string             `json:"taker_order_hash,omitempty"`
+	TxHash         string             `json:"tx_hash,omitempty"`
+	Error          *BuilderTakerError `json:"error,omitempty"`
+}
+
+type RFQStatusUpdate struct {
+	Type    MessageType `json:"type"`
+	RFQID   string      `json:"rfq_id,omitempty"`
+	QuoteID string      `json:"quote_id,omitempty"`
+	Status  string      `json:"status"`
+	Code    string      `json:"code,omitempty"`
+	Message string      `json:"message,omitempty"`
 }
 
 type SignedOrderV2 struct {

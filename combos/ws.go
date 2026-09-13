@@ -18,6 +18,9 @@ import (
 
 const DefaultRFQWSHost = "wss://combos-rfq-gateway-quoter.polymarket.sh"
 
+// DefaultTakerRFQWSHost is separate from the quoter gateway used by WSClient.
+const DefaultTakerRFQWSHost = "wss://combos-rfq-gateway-requester.polymarket.sh/ws"
+
 type WSClient struct {
 	url    string
 	dialer *websocket.Dialer
@@ -32,6 +35,19 @@ func NewWSClient(host string) *WSClient {
 	}
 	return &WSClient{
 		url:    buildWSURL(host),
+		dialer: websocket.DefaultDialer,
+	}
+}
+
+// NewTakerWSClient connects to the requester gateway used to place combos.
+// It intentionally returns WSClient so authentication, lifecycle, and event
+// consumption are identical to the existing maker client.
+func NewTakerWSClient(host string) *WSClient {
+	if strings.TrimSpace(host) == "" {
+		host = DefaultTakerRFQWSHost
+	}
+	return &WSClient{
+		url:    buildTakerWSURL(host),
 		dialer: websocket.DefaultDialer,
 	}
 }
@@ -138,6 +154,16 @@ func (c *WSClient) SendQuote(req combostypes.QuoteRequest) error {
 	})
 }
 
+func (c *WSClient) RequestTakerQuote(req combostypes.TakerQuoteRequest) error {
+	req.Type = combostypes.MessageTypeRFQCreate
+	return c.writeJSON(req)
+}
+
+func (c *WSClient) AcceptTakerQuote(req combostypes.TakerAcceptRequest) error {
+	req.Type = combostypes.MessageTypeRFQAccept
+	return c.writeJSON(req)
+}
+
 func (c *WSClient) CancelQuote(req combostypes.QuoteCancelRequest) error {
 	req.Type = combostypes.MessageTypeRFQQuoteCancel
 	return c.writeJSON(req)
@@ -173,6 +199,8 @@ type Event struct {
 	ConfirmationRequest     *combostypes.ConfirmationRequest
 	ConfirmationResponseAck *combostypes.ConfirmationRequest
 	ExecutionUpdate         *combostypes.ExecutionUpdate
+	TakerQuoteReady         *combostypes.TakerQuoteReady
+	StatusUpdate            *combostypes.RFQStatusUpdate
 	Error                   *combostypes.RFQError
 	Raw                     json.RawMessage
 	ReceivedAt              time.Time
@@ -235,6 +263,18 @@ func decodeEvent(data []byte) (*Event, error) {
 			return nil, err
 		}
 		ev.ExecutionUpdate = &msg
+	case combostypes.MessageTypeRFQQuoteReady:
+		var msg combostypes.TakerQuoteReady
+		if err := json.Unmarshal(data, &msg); err != nil {
+			return nil, err
+		}
+		ev.TakerQuoteReady = &msg
+	case combostypes.MessageTypeRFQStatusUpdate:
+		var msg combostypes.RFQStatusUpdate
+		if err := json.Unmarshal(data, &msg); err != nil {
+			return nil, err
+		}
+		ev.StatusUpdate = &msg
 	case combostypes.MessageTypeRFQError:
 		var msg combostypes.RFQError
 		if err := json.Unmarshal(data, &msg); err != nil {
@@ -254,6 +294,18 @@ func buildWSURL(host string) string {
 	}
 	if u.Path == "" {
 		u.Path = combostypes.RFQWebSocketPath
+	}
+	return u.String()
+}
+
+func buildTakerWSURL(host string) string {
+	host = strings.TrimRight(host, "/")
+	u, err := url.Parse(host)
+	if err != nil {
+		return strings.TrimRight(host, "/") + "/ws"
+	}
+	if u.Path == "" {
+		u.Path = "/ws"
 	}
 	return u.String()
 }

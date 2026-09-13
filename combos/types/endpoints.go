@@ -10,5 +10,7 @@ const (
 	GetComboPositions = "/v1/positions/combos"
 	GetComboActivity  = "/v1/activity/combos"
 
+	CreateBuilderRFQ = "/v1/builder/rfq/requests"
+
 	RFQWebSocketPath = "/ws/rfq"
 )
