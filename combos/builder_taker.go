@@ -21,6 +21,8 @@ import (
 // by Polymarket's official TypeScript client.
 const DefaultBuilderTakerGatewayHost = "https://combos-rfq-gateway-builder.polymarket.com"
 
+const builderTakerStatusAwaitingRequesterAcceptance = "AWAITING_REQUESTER_ACCEPTANCE"
+
 // BuilderTakerClient implements the official Builder Gateway Combo requester
 // API. It is independent from TakerRunner, which retains compatibility with
 // the existing requester WebSocket gateway.
@@ -94,16 +96,30 @@ func (c *BuilderTakerClient) GetRFQStatus(ctx context.Context, rfqID string, opt
 	return &out, nil
 }
 
-// Place creates an RFQ, builds the official requester order from the returned
-// quote, and submits acceptance. It does not wait for a fill; call
-// WaitForTerminalStatus with the returned RFQ ID to track execution.
-func (c *BuilderTakerClient) Place(ctx context.Context, request TakerRequest, option *sdktypes.AuthOption) (*combostypes.BuilderTakerStatus, error) {
-	rfq, err := c.CreateRFQ(ctx, request, option)
-	if err != nil {
-		return nil, err
+// AcceptQuote builds and signs the requester order for an executable RFQ,
+// then accepts its returned quote. Callers that need to inspect the quote
+// before accepting it should use CreateRFQ followed by this method.
+func (c *BuilderTakerClient) AcceptQuote(ctx context.Context, rfq *combostypes.BuilderTakerRFQ, option *sdktypes.AuthOption) (*combostypes.BuilderTakerStatus, error) {
+	if c == nil || c.builder == nil {
+		return nil, fmt.Errorf("builder taker client is required")
+	}
+	if rfq == nil {
+		return nil, fmt.Errorf("builder RFQ is required")
 	}
 	if rfq.Quote == nil {
-		return &combostypes.BuilderTakerStatus{RFQID: rfq.RFQID, Status: rfq.Status, Error: rfq.Error}, nil
+		return nil, fmt.Errorf("builder RFQ quote is required")
+	}
+	if strings.TrimSpace(rfq.RFQID) == "" {
+		return nil, fmt.Errorf("builder RFQ id is required")
+	}
+	if strings.TrimSpace(rfq.Quote.QuoteID) == "" {
+		return nil, fmt.Errorf("builder RFQ quote id is required")
+	}
+	if rfq.Status != builderTakerStatusAwaitingRequesterAcceptance {
+		return nil, fmt.Errorf("builder RFQ is not ready for acceptance: %s", rfq.Status)
+	}
+	if rfq.ExpiresAt <= time.Now().UnixMilli() {
+		return nil, fmt.Errorf("builder RFQ quote has expired")
 	}
 	if strings.TrimSpace(rfq.BuilderCode) == "" {
 		return nil, fmt.Errorf("builder gateway response missing builder_code")
@@ -128,6 +144,20 @@ func (c *BuilderTakerClient) Place(ctx context.Context, request TakerRequest, op
 		QuoteID:     rfq.Quote.QuoteID,
 		SignedOrder: order,
 	}, option)
+}
+
+// Place creates an RFQ, builds the official requester order from the returned
+// quote, and submits acceptance. It does not wait for a fill; call
+// WaitForTerminalStatus with the returned RFQ ID to track execution.
+func (c *BuilderTakerClient) Place(ctx context.Context, request TakerRequest, option *sdktypes.AuthOption) (*combostypes.BuilderTakerStatus, error) {
+	rfq, err := c.CreateRFQ(ctx, request, option)
+	if err != nil {
+		return nil, err
+	}
+	if rfq.Quote == nil {
+		return &combostypes.BuilderTakerStatus{RFQID: rfq.RFQID, Status: rfq.Status, Error: rfq.Error}, nil
+	}
+	return c.AcceptQuote(ctx, rfq, option)
 }
 
 // PlaceAndWait creates and accepts a Combo RFQ, then waits for its terminal

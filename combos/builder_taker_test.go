@@ -127,6 +127,139 @@ func TestBuilderTakerClientReturnsNoQuoteBusinessOutcome(t *testing.T) {
 	assert.Equal(t, 1, calls)
 }
 
+func TestBuilderTakerClientAcceptQuoteBuildsAndAcceptsOrder(t *testing.T) {
+	const builderCode = "0x0000000000000000000000000000000000000000000000000000000000000001"
+	var acceptCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		assert.Equal(t, combostypes.CreateBuilderRFQ+"/rfq-1/accept", r.URL.Path)
+		acceptCalls++
+		assertAccountAndBuilderHeaders(t, r)
+
+		var body combostypes.BuilderTakerAcceptRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "quote-1", body.QuoteID)
+		assert.Equal(t, "123456", body.SignedOrder.TokenID)
+		assert.Equal(t, builderCode, body.SignedOrder.Builder)
+		require.NoError(t, json.NewEncoder(w).Encode(combostypes.BuilderTakerStatus{
+			RFQID:          "rfq-1",
+			Status:         "EXECUTING",
+			TakerOrderHash: "0xorder",
+		}))
+	}))
+	defer server.Close()
+
+	client := NewBuilderTakerClient(server.URL, big.NewInt(137), testSign)
+	status, err := client.AcceptQuote(context.Background(), &combostypes.BuilderTakerRFQ{
+		RFQID:       "rfq-1",
+		Status:      builderTakerStatusAwaitingRequesterAcceptance,
+		ExpiresAt:   time.Now().Add(time.Minute).UnixMilli(),
+		BuilderCode: builderCode,
+		Request: combostypes.BuilderTakerRFQRequest{
+			YesPositionID: "123456",
+			Direction:     combostypes.DirectionBuy,
+			Side:          combostypes.ComboSideYes,
+		},
+		Quote: &combostypes.BuilderTakerQuote{
+			QuoteID:       "quote-1",
+			MakerAmountE6: "450000",
+			TakerAmountE6: "1000000",
+		},
+	}, builderTakerTestAuth())
+	require.NoError(t, err)
+	assert.Equal(t, "EXECUTING", status.Status)
+	assert.Equal(t, "0xorder", status.TakerOrderHash)
+	assert.Equal(t, 1, acceptCalls)
+}
+
+func TestBuilderTakerClientAcceptQuoteRejectsUnusableRFQ(t *testing.T) {
+	var signCalls int
+	client := NewBuilderTakerClient("http://example.invalid", big.NewInt(137), func(_ string, _ []byte) ([]byte, error) {
+		signCalls++
+		return make([]byte, 65), nil
+	})
+	option := builderTakerTestAuth()
+
+	_, err := client.AcceptQuote(context.Background(), nil, option)
+	require.ErrorContains(t, err, "RFQ is required")
+
+	_, err = client.AcceptQuote(context.Background(), &combostypes.BuilderTakerRFQ{}, option)
+	require.ErrorContains(t, err, "quote is required")
+
+	_, err = client.AcceptQuote(context.Background(), &combostypes.BuilderTakerRFQ{
+		RFQID:     "rfq-1",
+		Status:    builderTakerStatusAwaitingRequesterAcceptance,
+		ExpiresAt: time.Now().Add(time.Minute).UnixMilli(),
+		Quote: &combostypes.BuilderTakerQuote{
+			QuoteID: "quote-1",
+		},
+	}, option)
+	require.ErrorContains(t, err, "missing builder_code")
+
+	for _, tc := range []struct {
+		name   string
+		mutate func(*combostypes.BuilderTakerRFQ)
+		want   string
+	}{
+		{
+			name: "missing RFQ id",
+			mutate: func(rfq *combostypes.BuilderTakerRFQ) {
+				rfq.RFQID = ""
+			},
+			want: "RFQ id is required",
+		},
+		{
+			name: "missing quote id",
+			mutate: func(rfq *combostypes.BuilderTakerRFQ) {
+				rfq.Quote.QuoteID = ""
+			},
+			want: "quote id is required",
+		},
+		{
+			name: "not accept ready",
+			mutate: func(rfq *combostypes.BuilderTakerRFQ) {
+				rfq.Status = "EXECUTING"
+			},
+			want: "not ready for acceptance",
+		},
+		{
+			name: "expired",
+			mutate: func(rfq *combostypes.BuilderTakerRFQ) {
+				rfq.ExpiresAt = time.Now().Add(-time.Second).UnixMilli()
+			},
+			want: "quote has expired",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rfq := builderTakerTestAcceptableRFQ()
+			tc.mutate(rfq)
+			_, err := client.AcceptQuote(context.Background(), rfq, option)
+			require.ErrorContains(t, err, tc.want)
+		})
+	}
+
+	assert.Zero(t, signCalls)
+}
+
+func builderTakerTestAcceptableRFQ() *combostypes.BuilderTakerRFQ {
+	return &combostypes.BuilderTakerRFQ{
+		RFQID:       "rfq-1",
+		Status:      builderTakerStatusAwaitingRequesterAcceptance,
+		ExpiresAt:   time.Now().Add(time.Minute).UnixMilli(),
+		BuilderCode: "0x0000000000000000000000000000000000000000000000000000000000000001",
+		Request: combostypes.BuilderTakerRFQRequest{
+			YesPositionID: "123456",
+			Direction:     combostypes.DirectionBuy,
+			Side:          combostypes.ComboSideYes,
+		},
+		Quote: &combostypes.BuilderTakerQuote{
+			QuoteID:       "quote-1",
+			MakerAmountE6: "450000",
+			TakerAmountE6: "1000000",
+		},
+	}
+}
+
 func TestBuilderTakerRequestRejectsUnsupportedOfficialInputs(t *testing.T) {
 	_, err := builderTakerRequest(TakerRequest{
 		LegPositionIDs: []string{"111", "222"},
