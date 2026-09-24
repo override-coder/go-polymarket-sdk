@@ -275,6 +275,13 @@ func getOrderRawAmounts(side types.Side, size float64, price float64, roundConfi
 	rawPrice := utils.RoundNormal(price, roundConfig.Price)
 	if side == types.BUY {
 		rawTakerAmt := utils.RoundDown(size, roundConfig.Size)
+		if rawPrice > price && price > 0 {
+			// The caller sized shares at the unrounded price. Preserve that
+			// notional when price rounding would otherwise increase the spend.
+			budget := utils.Float64ToDecimal(size).Mul(utils.Float64ToDecimal(price))
+			adjustedSize, _ := budget.QuoRem(utils.Float64ToDecimal(rawPrice), int32(roundConfig.Size))
+			rawTakerAmt = adjustedSize.InexactFloat64()
+		}
 		rawMakerAmt := rawTakerAmt * rawPrice
 		if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
 			rawMakerAmt = utils.RoundUp(rawMakerAmt, roundConfig.Amount+4)
