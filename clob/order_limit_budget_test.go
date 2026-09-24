@@ -10,24 +10,26 @@ import (
 	"github.com/polymarket/go-order-utils/pkg/model"
 )
 
-func TestLimitBuyRoundingPreservesNotional(t *testing.T) {
+func TestLimitBuyRoundingDoesNotExceedNotional(t *testing.T) {
 	tests := []struct {
 		name                 string
 		price, size          float64
 		tick                 types.TickSize
 		wantMaker, wantTaker float64
 	}{
-		{"reported midpoint", 0.295, 33.89, types.TickSize001, 9.996, 33.32},
-		{"round up above midpoint", 0.296, 33.89, types.TickSize001, 10.029, 33.43},
+		{"reported midpoint keeps shares", 0.295, 33.89, types.TickSize001, 9.8281, 33.89},
+		{"above midpoint rounds down", 0.296, 33.89, types.TickSize001, 9.8281, 33.89},
 		{"round down keeps shares", 0.294, 33.89, types.TickSize001, 9.8281, 33.89},
 		{"aligned price keeps shares", 0.30, 33.89, types.TickSize001, 10.167, 33.89},
-		{"fractional shares", 0.295, 33.899, types.TickSize001, 9.999, 33.33},
-		{"low price", 0.015, 100, types.TickSize001, 1.5, 75},
-		{"one decimal", 0.25, 10, types.TickSize01, 2.499, 8.33},
-		{"three decimals", 0.2955, 10, types.TickSize0001, 2.95408, 9.98},
-		{"four decimals", 0.29555, 10, types.TickSize00001, 2.953044, 9.99},
+		{"fractional shares", 0.295, 33.899, types.TickSize001, 9.8281, 33.89},
+		{"low price", 0.015, 100, types.TickSize001, 1, 100},
+		{"low price preserves requested fill target", 0.085, 100, types.TickSize001, 8, 100},
+		{"minimum five shares preserved", 0.295, 5, types.TickSize001, 1.45, 5},
+		{"one decimal", 0.25, 10, types.TickSize01, 2, 10},
+		{"three decimals", 0.2955, 10, types.TickSize0001, 2.95, 10},
+		{"four decimals", 0.29555, 10, types.TickSize00001, 2.955, 10},
 		{"zero shares", 0.295, 0, types.TickSize001, 0, 0},
-		{"positive shares round down to zero", 0.295, 0.01, types.TickSize001, 0, 0},
+		{"small positive shares preserved", 0.295, 0.01, types.TickSize001, 0.0029, 0.01},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -72,8 +74,8 @@ func TestLimitBuyRoundingSignedAmounts(t *testing.T) {
 				"v1": {v1.MakerAmount, v1.TakerAmount},
 				"v2": {v2.MakerAmount, v2.TakerAmount},
 			} {
-				if amounts[0].String() != "9996000" || amounts[1].String() != "33320000" {
-					t.Errorf("%s signed maker=%s taker=%s, want 9996000 / 33320000", version, amounts[0], amounts[1])
+				if amounts[0].String() != "9828100" || amounts[1].String() != "33890000" {
+					t.Errorf("%s signed maker=%s taker=%s, want 9828100 / 33890000", version, amounts[0], amounts[1])
 				}
 			}
 			if signCalls != 2 {
@@ -84,9 +86,21 @@ func TestLimitBuyRoundingSignedAmounts(t *testing.T) {
 }
 
 func TestLimitSellRoundingKeepsShares(t *testing.T) {
-	side, maker, taker := getOrderRawAmounts(types.SELL, 33.89, 0.295, roundConfigForTickSize(types.TickSize001))
-	if side != model.SELL || maker != 33.89 || taker != 10.167 {
-		t.Fatalf("SELL changed: side=%v maker=%v taker=%v", side, maker, taker)
+	for _, tc := range []struct {
+		name              string
+		price, wantAmount float64
+	}{
+		{"below midpoint", 0.294, 9.8281},
+		{"at midpoint", 0.295, 10.167},
+		{"above midpoint", 0.296, 10.167},
+		{"aligned price", 0.30, 10.167},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			side, maker, taker := getOrderRawAmounts(types.SELL, 33.89, tc.price, roundConfigForTickSize(types.TickSize001))
+			if side != model.SELL || maker != 33.89 || taker != tc.wantAmount {
+				t.Fatalf("SELL changed: side=%v maker=%v taker=%v, want SELL maker=33.89 taker=%v", side, maker, taker, tc.wantAmount)
+			}
+		})
 	}
 }
 
