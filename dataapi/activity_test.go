@@ -3,10 +3,9 @@ package dataapi_test
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"net/url"
 	"testing"
 
 	"github.com/override-coder/go-polymarket-sdk/dataapi"
@@ -14,137 +13,66 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetUserActivityAllParameters(t *testing.T) {
-	const user = "0x1111111111111111111111111111111111111111"
-	market1 := "0x" + strings.Repeat("a", 64)
-	market2 := "0x" + strings.Repeat("b", 64)
-	limit := 501
-	offset := 5000
-	excludeDepositsWithdrawals := false
-	start := int64(1)
-	end := int64(1700000000)
-	sortBy := types.ActivitySortCASH
-	sortDirection := types.SortASC
-	side := types.SideSELL
-
+func TestV2ActivityAllParametersAndFields(t *testing.T) {
+	fixture := v2Fixture(t, "activity")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/activity", r.URL.Path)
-		require.Equal(t, user, r.URL.Query().Get("user"))
-		require.Equal(t, "500", r.URL.Query().Get("limit"))
-		require.Equal(t, "5000", r.URL.Query().Get("offset"))
-		require.Equal(t, market1+","+market2, r.URL.Query().Get("market"))
-		require.Equal(t, "DEPOSIT,WITHDRAWAL,YIELD,MAKER_REBATE,TAKER_REBATE,REFERRAL_REWARD", r.URL.Query().Get("type"))
-		require.Equal(t, "false", r.URL.Query().Get("excludeDepositsWithdrawals"))
-		require.Equal(t, "1", r.URL.Query().Get("start"))
-		require.Equal(t, "1700000000", r.URL.Query().Get("end"))
-		require.Equal(t, "CASH", r.URL.Query().Get("sortBy"))
-		require.Equal(t, "ASC", r.URL.Query().Get("sortDirection"))
-		require.Equal(t, "SELL", r.URL.Query().Get("side"))
-
+		require.Equal(t, "/v2/activity", r.URL.Path)
+		require.Equal(t, url.Values{
+			"user": {v2User}, "limit": {"1000"}, "condition": {v2Condition},
+			"type": {"DEPOSIT,WITHDRAWAL,TIP"}, "exclude_deposits_withdrawals": {"false"},
+			"start": {"1"}, "end": {"0"}, "sort_by": {"TIMESTAMP"}, "sort_direction": {"ASC"}, "side": {"SELL"},
+		}, r.URL.Query())
 		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprint(w, `[{
-			"proxyWallet":"`+user+`",
-			"timestamp":1700000000,
-			"conditionId":"`+market1+`",
-			"type":"TRADE",
-			"size":12.5,
-			"usdcSize":5,
-			"transactionHash":"0xabc",
-			"price":0.4,
-			"asset":"123",
-			"side":"SELL",
-			"outcomeIndex":1,
-			"title":"Election",
-			"slug":"election",
-			"icon":"https://example.com/icon.png",
-			"eventSlug":"election-event",
-			"outcome":"Yes",
-			"name":"Trader",
-			"pseudonym":"trader",
-			"bio":"bio",
-			"profileImage":"https://example.com/profile.png",
-			"profileImageOptimized":"https://example.com/profile-optimized.png",
-			"isCombo":true
-		}]`)
-		require.NoError(t, err)
+		fmt.Fprintf(w, `{"data":[%s],"pagination":{"limit":1000,"offset":0,"has_more":true,"next_cursor":"activity+/="}}`, fixture)
 	}))
-	t.Cleanup(server.Close)
-
-	client := dataapi.NewClient(server.URL, big.NewInt(137))
-	activities, err := client.GetUserActivity(context.Background(), types.ActivityQuery{
-		User:                       "  " + user + "  ",
-		Limit:                      &limit,
-		Offset:                     &offset,
-		Market:                     []string{market1, market2},
-		Type:                       []types.ActivityType{types.ActivityDEPOSIT, types.ActivityWITHDRAWAL, types.ActivityYIELD, types.ActivityMAKERREBATE, types.ActivityTAKERREBATE, types.ActivityREFERRALREWARD},
-		ExcludeDepositsWithdrawals: &excludeDepositsWithdrawals,
-		Start:                      &start,
-		End:                        &end,
-		SortBy:                     &sortBy,
-		SortDirection:              &sortDirection,
-		Side:                       &side,
+	defer server.Close()
+	page, err := dataapi.NewClient(server.URL, nil).GetUserActivity(context.Background(), types.ActivityQuery{
+		User: v2User, Limit: v2Ptr(1000), Condition: []string{v2Condition},
+		Type: []types.ActivityType{types.ActivityDEPOSIT, types.ActivityWITHDRAWAL, types.ActivityTIP}, ExcludeDepositsWithdrawals: v2Ptr(false),
+		Start: v2Ptr(int64(1)), End: v2Ptr(int64(0)), SortBy: v2Ptr(types.ActivitySortTIMESTAMP), SortDirection: v2Ptr(types.SortASC), Side: v2Ptr(types.SideSELL),
 	})
-
 	require.NoError(t, err)
-	require.Len(t, activities, 1)
-	require.Equal(t, "TRADE", activities[0].Type)
-	require.Equal(t, "SELL", activities[0].Side)
-	require.True(t, activities[0].IsCombo)
+	require.Len(t, page.Data, 1)
+	assertV2JSON(t, fixture, page.Data[0])
+	require.Equal(t, "activity+/=", *page.Pagination.NextCursor)
 }
 
-func TestGetUserActivityDefaultsAndEventIDs(t *testing.T) {
-	const user = "0x1111111111111111111111111111111111111111"
-
+func TestV2ActivityCursorEventsAndTIP(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "12,34", r.URL.Query().Get("eventId"))
-		require.Equal(t, "100", r.URL.Query().Get("limit"))
-		require.Equal(t, "0", r.URL.Query().Get("offset"))
-		require.Equal(t, "true", r.URL.Query().Get("excludeDepositsWithdrawals"))
-		require.Equal(t, "TIMESTAMP", r.URL.Query().Get("sortBy"))
-		require.Equal(t, "DESC", r.URL.Query().Get("sortDirection"))
-		_, err := fmt.Fprint(w, `[]`)
-		require.NoError(t, err)
+		require.Equal(t, url.Values{"user": {v2User}, "event_id": {"12,34"}, "cursor": {"activity+/="}, "type": {"TIP"}, "start": {"1"}}, r.URL.Query())
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"data":[{"type":"TIP","side":"IN","size":1.25,"outcome_index":999}],"pagination":{"limit":100,"offset":100,"has_more":false,"next_cursor":null}}`)
 	}))
-	t.Cleanup(server.Close)
-
-	client := dataapi.NewClient(server.URL, big.NewInt(137))
-	activities, err := client.GetUserActivity(context.Background(), types.ActivityQuery{
-		User:    user,
-		EventID: []int64{12, 34},
+	defer server.Close()
+	page, err := dataapi.NewClient(server.URL, nil).GetUserActivity(context.Background(), types.ActivityQuery{
+		User: v2User, EventID: []int64{12, 34}, Cursor: v2Ptr("activity+/="), Type: []types.ActivityType{types.ActivityTIP}, Start: v2Ptr(int64(1)),
 	})
-
 	require.NoError(t, err)
-	require.Empty(t, activities)
+	require.Nil(t, page.Pagination.NextCursor)
+	require.Equal(t, "IN", page.Data[0].Side)
+	require.Equal(t, 1.25, page.Data[0].Size)
+	require.Nil(t, page.Data[0].IsCombo)
 }
 
-func TestGetUserActivityValidation(t *testing.T) {
-	validUser := "0x1111111111111111111111111111111111111111"
-	validMarket := "0x" + strings.Repeat("a", 64)
-	negative := -1
-	offsetTooHigh := 5001
-	negativeTimestamp := int64(-1)
-
-	tests := []struct {
-		name  string
-		query types.ActivityQuery
-	}{
-		{name: "missing user", query: types.ActivityQuery{}},
-		{name: "invalid user", query: types.ActivityQuery{User: "0x1234"}},
-		{name: "market and event", query: types.ActivityQuery{User: validUser, Market: []string{validMarket}, EventID: []int64{1}}},
-		{name: "invalid market", query: types.ActivityQuery{User: validUser, Market: []string{"0x1234"}}},
-		{name: "invalid event", query: types.ActivityQuery{User: validUser, EventID: []int64{0}}},
-		{name: "negative limit", query: types.ActivityQuery{User: validUser, Limit: &negative}},
-		{name: "negative offset", query: types.ActivityQuery{User: validUser, Offset: &negative}},
-		{name: "offset too high", query: types.ActivityQuery{User: validUser, Offset: &offsetTooHigh}},
-		{name: "negative start", query: types.ActivityQuery{User: validUser, Start: &negativeTimestamp}},
-		{name: "negative end", query: types.ActivityQuery{User: validUser, End: &negativeTimestamp}},
-	}
-
-	client := dataapi.NewClient("http://127.0.0.1:1", big.NewInt(137))
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := client.GetUserActivity(context.Background(), tt.query)
+func TestV2ActivityDefaultsAndValidation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, url.Values{"user": {v2User}}, r.URL.Query())
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"data":[],"pagination":{"limit":100,"offset":0,"has_more":false,"next_cursor":null}}`)
+	}))
+	defer server.Close()
+	_, err := dataapi.NewClient(server.URL, nil).GetUserActivity(context.Background(), types.ActivityQuery{User: v2User})
+	require.NoError(t, err)
+	for name, q := range map[string]types.ActivityQuery{
+		"missing user":        {},
+		"condition and event": {User: v2User, Condition: []string{v2Condition}, EventID: []int64{1}},
+		"invalid condition":   {User: v2User, Condition: []string{"bad"}},
+		"limit past cap":      {User: v2User, Limit: v2Ptr(1001)},
+		"CASH sort":           {User: v2User, SortBy: v2Ptr(types.ActivitySortBy("CASH"))},
+		"TOKENS sort":         {User: v2User, SortBy: v2Ptr(types.ActivitySortBy("TOKENS"))},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := dataapi.NewClient("http://127.0.0.1:1", nil).GetUserActivity(context.Background(), q)
 			require.Error(t, err)
 		})
 	}

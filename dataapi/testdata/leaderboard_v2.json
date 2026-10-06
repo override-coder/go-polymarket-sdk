@@ -1,0 +1,10 @@
+{
+  "pnl": 123.456,
+  "profile_image": "sample-profile_image",
+  "rank": 2,
+  "user_id": "sample-user_id",
+  "user_name": "sample-user_name",
+  "verified": true,
+  "volume": 123.456,
+  "x_username": "sample-x_username"
+}

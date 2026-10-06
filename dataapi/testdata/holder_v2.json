@@ -1,0 +1,20 @@
+{
+  "amount": 1.25,
+  "avg_price": 1.25,
+  "bio": "sample-bio",
+  "current_price": 1.25,
+  "current_value": 1.25,
+  "display_username_public": true,
+  "entry_cost_usdc": 1.25,
+  "name": "sample-name",
+  "outcome_index": 1,
+  "profile_image": "sample-profile_image",
+  "profile_image_optimized": "",
+  "proxy_wallet": "sample-proxy_wallet",
+  "pseudonym": "sample-pseudonym",
+  "realized_pnl": 0,
+  "token_id": "sample-token_id",
+  "total_pnl": 1.25,
+  "unrealized_pnl": 1.25,
+  "verified": true
+}

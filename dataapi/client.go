@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/override-coder/go-polymarket-sdk/dataapi/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
@@ -40,415 +40,206 @@ func NewClientWithClobHost(host, clobHost string, chainId *big.Int) *Client {
 	}
 }
 
-func (c *Client) GetPositions(ctx context.Context, q types.PositionsQuery) ([]types.Position, error) {
-	if strings.TrimSpace(q.User) == "" {
-		return nil, fmt.Errorf("user is required")
+// GetPositions returns one V2 page. Follow Pagination.NextCursor and keep the
+// same user/condition anchor and filters; a short page is not an end marker.
+func (c *Client) GetPositions(ctx context.Context, q types.PositionsQuery) (*types.Page[types.Position], error) {
+	user := strings.TrimSpace(q.User)
+	if user == "" && len(q.Condition) == 0 {
+		return nil, fmt.Errorf("user or condition is required")
 	}
-	if len(q.Market) > 0 && len(q.EventID) > 0 {
-		return nil, fmt.Errorf("market and eventId are mutually exclusive")
+	if err := validateConditions(q.Condition); err != nil {
+		return nil, err
 	}
-	if len(q.Market) > 0 {
-		re := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
-		for _, m := range q.Market {
-			if !re.MatchString(m) {
-				return nil, fmt.Errorf("invalid conditionId: %s (must be 0x + 64 hex chars)", m)
-			}
-		}
+	if user == "" && distinctCount(q.Condition) != 1 {
+		return nil, fmt.Errorf("market-anchored positions require exactly one condition")
 	}
-
-	limit := 100
-	if q.Limit != nil {
-		if *q.Limit < 0 || *q.Limit > 500 {
-			return nil, fmt.Errorf("limit out of range (0..500)")
-		}
-		limit = *q.Limit
+	if user == "" && len(q.EventID) > 0 {
+		return nil, fmt.Errorf("event_id requires user")
 	}
-	offset := 0
-	if q.Offset != nil {
-		if *q.Offset < 0 || *q.Offset > 10000 {
-			return nil, fmt.Errorf("offset out of range (0..10000)")
-		}
-		offset = *q.Offset
+	if err := validateEventIDs(q.EventID); err != nil {
+		return nil, err
 	}
-	sortBy := types.SortByTOKENS
-	if q.SortBy != nil {
-		sortBy = *q.SortBy
+	if q.Title != nil && utf8.RuneCountInString(*q.Title) > 200 {
+		return nil, fmt.Errorf("title too long (max 200 characters)")
 	}
-	sortDir := types.SortDESC
-	if q.SortDirection != nil {
-		sortDir = *q.SortDirection
+	params := map[string]any{}
+	if user != "" {
+		params["user"] = user
 	}
-	if q.Title != nil && len(*q.Title) > 100 {
-		return nil, fmt.Errorf("title too long (max 100)")
-	}
-
-	params := map[string]any{
-		"user":          q.User,
-		"limit":         limit,
-		"offset":        offset,
-		"sortBy":        string(sortBy),
-		"sortDirection": string(sortDir),
-	}
-	if q.SizeThreshold != nil {
-		if *q.SizeThreshold < 0 {
-			return nil, fmt.Errorf("sizeThreshold must be >= 0")
-		}
-		params["sizeThreshold"] = *q.SizeThreshold
-	}
-	if q.Redeemable != nil {
-		params["redeemable"] = *q.Redeemable
-	}
-	if q.Mergeable != nil {
-		params["mergeable"] = *q.Mergeable
-	}
-	if q.Title != nil && *q.Title != "" {
-		params["title"] = *q.Title
-	}
-	if len(q.Market) > 0 {
-		params["market"] = strings.Join(q.Market, ",")
+	if len(q.Condition) > 0 {
+		params["condition"] = strings.Join(q.Condition, ",")
 	}
 	if len(q.EventID) > 0 {
-		strIDs := make([]string, 0, len(q.EventID))
-		for _, id := range q.EventID {
-			strIDs = append(strIDs, fmt.Sprintf("%d", id))
-		}
-		params["eventId"] = strings.Join(strIDs, ",")
+		params["event_id"] = joinEventIDs(q.EventID)
 	}
-
-	var out []types.Position
-	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_POSITIONS, &http2.RequestOptions{
-		Params: params,
-	}, &out)
+	if err := addPageParams(params, q.Limit, q.Cursor); err != nil {
+		return nil, err
+	}
+	addParam(params, "status", q.Status)
+	addParam(params, "title", q.Title)
+	addParam(params, "filter_type", q.FilterType)
+	addParam(params, "filter_amount", q.FilterAmount)
+	addParam(params, "include_archived", q.IncludeArchived)
+	addParam(params, "sort_by", q.SortBy)
+	addParam(params, "start", q.Start)
+	addParam(params, "end", q.End)
+	addParam(params, "sort_direction", q.SortDirection)
+	var out types.Page[types.Position]
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_POSITIONS, &http2.RequestOptions{Params: params}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
-	return out, nil
+	return &out, nil
 }
 
-func (c *Client) GetClosedPositions(ctx context.Context, q types.ClosedPositionsQuery) ([]types.ClosedPosition, error) {
+// GetClosedPositions is GetPositions with status=CLOSED. The service chooses
+// REALIZED_PNL DESC by default; callers may explicitly select another V2 sort.
+func (c *Client) GetClosedPositions(ctx context.Context, q types.ClosedPositionsQuery) (*types.Page[types.ClosedPosition], error) {
+	if q.Status != nil && *q.Status != types.PositionCLOSED {
+		return nil, fmt.Errorf("closed positions require status=CLOSED")
+	}
+	status := types.PositionCLOSED
+	q.Status = &status
+	return c.GetPositions(ctx, q)
+}
+
+// GetUserActivity returns one V2 activity page. Keep all filters unchanged
+// when following NextCursor; the cursor alone does not bind the feed filters.
+func (c *Client) GetUserActivity(ctx context.Context, q types.ActivityQuery) (*types.Page[types.UserActivity], error) {
 	user := strings.TrimSpace(q.User)
 	if user == "" {
 		return nil, fmt.Errorf("user is required")
 	}
-	if !regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`).MatchString(user) {
-		return nil, fmt.Errorf("invalid user address: %s", q.User)
+	if len(q.Condition) > 0 && len(q.EventID) > 0 {
+		return nil, fmt.Errorf("condition and event_id are mutually exclusive")
 	}
-	if len(q.Market) > 0 && len(q.EventID) > 0 {
-		return nil, fmt.Errorf("market and eventId are mutually exclusive")
+	if err := validateConditions(q.Condition); err != nil {
+		return nil, err
 	}
-
-	conditionIDPattern := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
-	for _, market := range q.Market {
-		if !conditionIDPattern.MatchString(market) {
-			return nil, fmt.Errorf("invalid conditionId: %s (must be 0x + 64 hex chars)", market)
-		}
+	if err := validateEventIDs(q.EventID); err != nil {
+		return nil, err
 	}
-	for _, eventID := range q.EventID {
-		if eventID < 1 {
-			return nil, fmt.Errorf("eventId must be >= 1")
-		}
+	if q.SortBy != nil && *q.SortBy != types.ActivitySortTIMESTAMP {
+		return nil, fmt.Errorf("activity only supports sort_by=TIMESTAMP")
 	}
-
-	limit := 10
-	if q.Limit != nil {
-		if *q.Limit < 0 || *q.Limit > 50 {
-			return nil, fmt.Errorf("limit out of range (0..50)")
-		}
-		limit = *q.Limit
+	params := map[string]any{"user": user}
+	if err := addPageParams(params, q.Limit, q.Cursor); err != nil {
+		return nil, err
 	}
-	offset := 0
-	if q.Offset != nil {
-		if *q.Offset < 0 || *q.Offset > 100000 {
-			return nil, fmt.Errorf("offset out of range (0..100000)")
-		}
-		offset = *q.Offset
-	}
-	if q.Title != nil && len(*q.Title) > 100 {
-		return nil, fmt.Errorf("title too long (max 100)")
-	}
-
-	sortBy := types.ClosedPositionSortByTIMESTAMP
-	if q.SortBy != nil {
-		sortBy = *q.SortBy
-	}
-	sortDirection := types.SortDESC
-	if q.SortDirection != nil {
-		sortDirection = *q.SortDirection
-	}
-
-	params := map[string]any{
-		"user":          user,
-		"limit":         limit,
-		"offset":        offset,
-		"sortBy":        string(sortBy),
-		"sortDirection": string(sortDirection),
-	}
-	if len(q.Market) > 0 {
-		params["market"] = strings.Join(q.Market, ",")
-	}
-	if q.Title != nil && *q.Title != "" {
-		params["title"] = *q.Title
+	if len(q.Condition) > 0 {
+		params["condition"] = strings.Join(q.Condition, ",")
 	}
 	if len(q.EventID) > 0 {
-		eventIDs := make([]string, 0, len(q.EventID))
-		for _, eventID := range q.EventID {
-			eventIDs = append(eventIDs, fmt.Sprintf("%d", eventID))
-		}
-		params["eventId"] = strings.Join(eventIDs, ",")
-	}
-
-	var out []types.ClosedPosition
-	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_CLOSED_POSITIONS, &http2.RequestOptions{
-		Params: params,
-	}, &out)
-	if _, e := http2.ParseHTTPError(resp, err); e != nil {
-		return nil, e
-	}
-	return out, nil
-}
-
-func (c *Client) GetUserActivity(ctx context.Context, q types.ActivityQuery) ([]types.UserActivity, error) {
-	user := strings.TrimSpace(q.User)
-	if user == "" {
-		return nil, fmt.Errorf("user is required")
-	}
-	if !regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`).MatchString(user) {
-		return nil, fmt.Errorf("invalid user address: %s", q.User)
-	}
-	if len(q.Market) > 0 && len(q.EventID) > 0 {
-		return nil, fmt.Errorf("market and eventId are mutually exclusive")
-	}
-
-	conditionIDPattern := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
-	for _, market := range q.Market {
-		if !conditionIDPattern.MatchString(market) {
-			return nil, fmt.Errorf("invalid conditionId: %s (must be 0x + 64 hex chars)", market)
-		}
-	}
-	for _, eventID := range q.EventID {
-		if eventID < 1 {
-			return nil, fmt.Errorf("eventId must be >= 1")
-		}
-	}
-
-	limit := 100
-	if q.Limit != nil {
-		if *q.Limit < 0 {
-			return nil, fmt.Errorf("limit must be >= 0")
-		}
-		limit = *q.Limit
-		if limit > 500 {
-			limit = 500
-		}
-	}
-	offset := 0
-	if q.Offset != nil {
-		if *q.Offset < 0 || *q.Offset > 5000 {
-			return nil, fmt.Errorf("offset out of range (0..5000)")
-		}
-		offset = *q.Offset
-	}
-	sortBy := types.ActivitySortTIMESTAMP
-	if q.SortBy != nil {
-		sortBy = *q.SortBy
-	}
-	sortDir := types.SortDESC
-	if q.SortDirection != nil {
-		sortDir = *q.SortDirection
-	}
-	if q.Start != nil && *q.Start < 0 {
-		return nil, fmt.Errorf("start must be >= 0")
-	}
-	if q.End != nil && *q.End < 0 {
-		return nil, fmt.Errorf("end must be >= 0")
-	}
-
-	excludeDepositsWithdrawals := true
-	if q.ExcludeDepositsWithdrawals != nil {
-		excludeDepositsWithdrawals = *q.ExcludeDepositsWithdrawals
-	}
-
-	params := map[string]any{
-		"user":                       user,
-		"limit":                      limit,
-		"offset":                     offset,
-		"sortBy":                     string(sortBy),
-		"sortDirection":              string(sortDir),
-		"excludeDepositsWithdrawals": excludeDepositsWithdrawals,
-	}
-	if len(q.Market) > 0 {
-		params["market"] = strings.Join(q.Market, ",")
-	}
-	if len(q.EventID) > 0 {
-		strIDs := make([]string, 0, len(q.EventID))
-		for _, id := range q.EventID {
-			strIDs = append(strIDs, fmt.Sprintf("%d", id))
-		}
-		params["eventId"] = strings.Join(strIDs, ",")
+		params["event_id"] = joinEventIDs(q.EventID)
 	}
 	if len(q.Type) > 0 {
-		typesStr := make([]string, 0, len(q.Type))
-		for _, t := range q.Type {
-			typesStr = append(typesStr, string(t))
+		values := make([]string, len(q.Type))
+		for i, t := range q.Type {
+			values[i] = string(t)
 		}
-		params["type"] = strings.Join(typesStr, ",")
+		params["type"] = strings.Join(values, ",")
 	}
-	if q.Start != nil {
-		params["start"] = *q.Start
-	}
-	if q.End != nil {
-		params["end"] = *q.End
-	}
-	if q.Side != nil {
-		params["side"] = string(*q.Side)
-	}
-
-	var out []types.UserActivity
-	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_Activity, &http2.RequestOptions{
-		Params: params,
-	}, &out)
+	addParam(params, "exclude_deposits_withdrawals", q.ExcludeDepositsWithdrawals)
+	addParam(params, "start", q.Start)
+	addParam(params, "end", q.End)
+	addParam(params, "sort_by", q.SortBy)
+	addParam(params, "sort_direction", q.SortDirection)
+	addParam(params, "side", q.Side)
+	var out types.Page[types.UserActivity]
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_Activity, &http2.RequestOptions{Params: params}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
-	return out, nil
+	return &out, nil
 }
 
-func (c *Client) GetPositionValue(ctx context.Context, q types.PositionValueQuery) ([]types.PositionValue, error) {
-	if strings.TrimSpace(q.User) == "" {
+// GetPositionValue returns single-market mark value plus unresolved combos at
+// cost basis. A condition filter excludes combos. An empty wallet has value 0.
+func (c *Client) GetPositionValue(ctx context.Context, q types.PositionValueQuery) (*types.Envelope[types.PositionValue], error) {
+	user := strings.TrimSpace(q.User)
+	if user == "" {
 		return nil, fmt.Errorf("user is required")
 	}
-	params := map[string]any{
-		"user": q.User,
+	if err := validateConditions(q.Condition); err != nil {
+		return nil, err
 	}
-	if len(q.Market) > 0 {
-		params["market"] = strings.Join(q.Market, ",")
+	params := map[string]any{"user": user}
+	if len(q.Condition) > 0 {
+		params["condition"] = strings.Join(q.Condition, ",")
 	}
-
-	var out []types.PositionValue
-	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_VALUE, &http2.RequestOptions{
-		Params: params,
-	}, &out)
+	var out types.Envelope[types.PositionValue]
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_VALUE, &http2.RequestOptions{Params: params}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
-	return out, nil
-
+	return &out, nil
 }
 
-func (c *Client) GetTraderLeaderboardRankings(
-	ctx context.Context,
-	q types.TraderLeaderboardQuery,
-) ([]types.TraderLeaderboard, error) {
-
-	category := types.LeaderboardCategoryOVERALL
-	if q.Category != nil {
-		category = *q.Category
+// GetTraderLeaderboardRankings returns one page of the V2 board. A cursor pins
+// the board; leave omitted parameters unset to resume without overriding it.
+func (c *Client) GetTraderLeaderboardRankings(ctx context.Context, q types.TraderLeaderboardQuery) (*types.Page[types.TraderLeaderboard], error) {
+	params := map[string]any{}
+	if err := addPageParams(params, q.Limit, q.Cursor); err != nil {
+		return nil, err
 	}
-
-	timePeriod := types.LeaderboardTimeDAY
-	if q.TimePeriod != nil {
-		timePeriod = *q.TimePeriod
-	}
-
-	orderBy := types.LeaderboardOrderByPNL
-	if q.OrderBy != nil {
-		orderBy = *q.OrderBy
-	}
-
-	limit := 25
-	if q.Limit != nil {
-		if *q.Limit < 1 || *q.Limit > 50 {
-			return nil, fmt.Errorf("limit out of range (1..50)")
-		}
-		limit = *q.Limit
-	}
-
-	offset := 0
-	if q.Offset != nil {
-		if *q.Offset < 0 || *q.Offset > 1000 {
-			return nil, fmt.Errorf("offset out of range (0..1000)")
-		}
-		offset = *q.Offset
-	}
-
-	params := map[string]any{
-		"category":   string(category),
-		"timePeriod": string(timePeriod),
-		"orderBy":    string(orderBy),
-		"limit":      limit,
-		"offset":     offset,
-	}
-
-	if q.User != nil && strings.TrimSpace(*q.User) != "" {
-		re := regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
-		if !re.MatchString(*q.User) {
-			return nil, fmt.Errorf("invalid user address: %s", *q.User)
-		}
-		params["user"] = *q.User
-	}
-
-	if q.UserName != nil && strings.TrimSpace(*q.UserName) != "" {
-		params["userName"] = *q.UserName
-	}
-
-	var out []types.TraderLeaderboard
-	resp, err := c.client.DoRequest(
-		ctx,
-		http.MethodGet,
-		types.GET_LEADERBOARD,
-		&http2.RequestOptions{Params: params},
-		&out,
-	)
-
+	addParam(params, "category", q.Category)
+	addParam(params, "time_period", q.TimePeriod)
+	addParam(params, "sort_by", q.SortBy)
+	var out types.Page[types.TraderLeaderboard]
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_LEADERBOARD, &http2.RequestOptions{Params: params}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
-
-	return out, nil
+	return &out, nil
 }
 
-func (c *Client) GetTopHoldersForMarkets(ctx context.Context, q types.TopHoldersQuery) ([]types.TopHoldersForMarket, error) {
-	if len(q.Market) == 0 {
-		return nil, fmt.Errorf("market is required")
+// GetTraderLeaderboardUser reads the user branch of /v2/leaderboard. Data is
+// nil for an unknown user; either rank may be nil for an existing user.
+func (c *Client) GetTraderLeaderboardUser(ctx context.Context, q types.TraderLeaderboardUserQuery) (*types.Envelope[*types.TraderLeaderboardUser], error) {
+	user := strings.TrimSpace(q.User)
+	if user == "" {
+		return nil, fmt.Errorf("user is required")
 	}
-
-	re := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
-	for _, m := range q.Market {
-		if !re.MatchString(m) {
-			return nil, fmt.Errorf("invalid conditionId: %s (must be 0x + 64 hex chars)", m)
-		}
-	}
-
-	limit := 20
-	if q.Limit != nil {
-		if *q.Limit < 0 || *q.Limit > 20 {
-			return nil, fmt.Errorf("limit out of range (0..20)")
-		}
-		limit = *q.Limit
-	}
-
-	minBalance := 1
-	if q.MinBalance != nil {
-		if *q.MinBalance < 0 || *q.MinBalance > 999999 {
-			return nil, fmt.Errorf("minBalance out of range (0..999999)")
-		}
-		minBalance = *q.MinBalance
-	}
-
-	params := map[string]any{
-		"market":     strings.Join(q.Market, ","),
-		"limit":      limit,
-		"minBalance": minBalance,
-	}
-
-	var out []types.TopHoldersForMarket
-	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_HOLDERS, &http2.RequestOptions{
-		Params: params,
-	}, &out)
+	params := map[string]any{"user": user}
+	addParam(params, "category", q.Category)
+	addParam(params, "time_period", q.TimePeriod)
+	var out types.Envelope[*types.TraderLeaderboardUser]
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_LEADERBOARD, &http2.RequestOptions{Params: params}, &out)
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
-	return out, nil
+	return &out, nil
+}
+
+// GetTopHoldersForMarkets returns a page per outcome token. Merge pages by
+// TokenID, not array position: exhausted token groups disappear on later pages.
+func (c *Client) GetTopHoldersForMarkets(ctx context.Context, q types.TopHoldersQuery) (*types.Page[types.TopHoldersForMarket], error) {
+	if len(q.Condition) == 0 {
+		return nil, fmt.Errorf("condition is required")
+	}
+	if err := validateConditions(q.Condition); err != nil {
+		return nil, err
+	}
+	if q.IncludePnL != nil && *q.IncludePnL {
+		if distinctCount(q.Condition) != 1 {
+			return nil, fmt.Errorf("include_pnl requires exactly one condition")
+		}
+		if (q.Cursor == nil || *q.Cursor == "") && q.Limit != nil && *q.Limit > 100 {
+			return nil, fmt.Errorf("include_pnl limit must be <= 100")
+		}
+	}
+	params := map[string]any{"condition": strings.Join(q.Condition, ",")}
+	if err := addPageParams(params, q.Limit, q.Cursor); err != nil {
+		return nil, err
+	}
+	addParam(params, "min_balance", q.MinBalance)
+	addParam(params, "include_pnl", q.IncludePnL)
+	var out types.Page[types.TopHoldersForMarket]
+	resp, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_HOLDERS, &http2.RequestOptions{Params: params}, &out)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return &out, nil
 }
 
 func (c *Client) GetMarketByToken(ctx context.Context, tokenID string) (*types.MarketByTokenResponse, error) {

@@ -1,6 +1,7 @@
 package dataapi_test
 
 import (
+	"context"
 	"github.com/override-coder/go-polymarket-sdk/dataapi"
 	"github.com/override-coder/go-polymarket-sdk/dataapi/types"
 	"github.com/stretchr/testify/assert"
@@ -16,19 +17,19 @@ var (
 func TestGetPositions(t *testing.T) {
 	client := dataapi.NewClient(PolymarketRelayURL, chaindId)
 
-	positions, err := client.GetPositions(types.PositionsQuery{
+	positions, err := client.GetPositions(context.Background(), types.PositionsQuery{
 		User: "0x0f863d92dd2b960e3eb6a23a35fd92a91981404e",
 	})
 	assert.Equal(t, nil, err)
 	t.Logf("positions: %v", positions)
 
-	activity, err := client.GetUserActivity(types.ActivityQuery{
+	activity, err := client.GetUserActivity(context.Background(), types.ActivityQuery{
 		User: "0x0f863d92dd2b960e3eb6a23a35fd92a91981404e",
 	})
 	assert.Equal(t, nil, err)
 	t.Logf("activitys: %v", activity)
 
-	value, err := client.GetPositionValue(types.PositionValueQuery{
+	value, err := client.GetPositionValue(context.Background(), types.PositionValueQuery{
 		User: "0x4b5bB26F866d98B2C92096fD6d80D6D01B6313f5",
 	})
 	assert.Equal(t, nil, err)
