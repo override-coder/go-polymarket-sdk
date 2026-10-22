@@ -120,6 +120,8 @@ type Market struct {
 	ID                    string           `json:"id"`
 	Question              *string          `json:"question"`
 	ConditionID           string           `json:"conditionId"`
+	PositionIDs           []string         `json:"positionIds"`
+	ComboStatus           *string          `json:"comboStatus"`
 	Slug                  *string          `json:"slug"`
 	TwitterCardImage      *string          `json:"twitterCardImage"`
 	ResolutionSource      *string          `json:"resolutionSource"`
