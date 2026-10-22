@@ -478,6 +478,7 @@ type GetMarketsKeysetParams struct {
 	Decimalized       *bool            `json:"decimalized,omitempty"`
 	CLOBTokenIDs      []string         `json:"clob_token_ids,omitempty"`
 	ConditionIDs      []string         `json:"condition_ids,omitempty"`
+	PositionIDs       []string         `json:"position_ids,omitempty"`
 	QuestionIDs       []string         `json:"question_ids,omitempty"`
 	MarketMakerAddr   []string         `json:"market_maker_address,omitempty"`
 	LiquidityNumMin   *decimal.Decimal `json:"liquidity_num_min,omitempty"`

@@ -252,6 +252,12 @@ func (c *Client) GetMarketsByKeyset(ctx context.Context, p *types.GetMarketsKeys
 			qs.Add("condition_ids", s)
 		}
 	}
+	for _, s := range p.PositionIDs {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			qs.Add("position_ids", s)
+		}
+	}
 	for _, s := range p.QuestionIDs {
 		s = strings.TrimSpace(s)
 		if s != "" {
