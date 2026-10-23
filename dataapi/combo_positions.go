@@ -4,11 +4,27 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/override-coder/go-polymarket-sdk/dataapi/types"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
 )
+
+// PositionManager conditions are bytes31, unlike ordinary CTF bytes32 IDs.
+var comboConditionPattern = regexp.MustCompile(`^0x[0-9a-fA-F]{62}$`)
+
+func validateComboConditions(values []string) error {
+	if distinctCount(values) > 20 {
+		return fmt.Errorf("condition supports at most 20 distinct IDs")
+	}
+	for _, value := range values {
+		if !comboConditionPattern.MatchString(value) {
+			return fmt.Errorf("invalid combo condition ID: %s (must be 0x + 62 hex chars)", value)
+		}
+	}
+	return nil
+}
 
 // GetComboPositions reads a page of enriched Combo holdings. Sorting is done by
 // the server across all pages, not locally on the returned page.
@@ -17,7 +33,7 @@ func (c *Client) GetComboPositions(ctx context.Context, q types.ComboPositionsQu
 	if user == "" {
 		return nil, fmt.Errorf("user is required")
 	}
-	if err := validateConditions(q.Condition); err != nil {
+	if err := validateComboConditions(q.Condition); err != nil {
 		return nil, err
 	}
 	if q.SortBy != nil {
