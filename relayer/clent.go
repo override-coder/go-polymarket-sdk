@@ -30,12 +30,12 @@ type Client struct {
 	depositWalletContractConfig *types.DepositWalletContractConfig
 }
 
-func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, builderApiKeyCreds *sdktypes.BuilderApiKeyCreds) *Client {
+func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, builderApiKeyCreds *sdktypes.BuilderApiKeyCreds, options ...http2.Option) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
 	return &Client{
-		client:                      http2.NewClient(host),
+		client:                      http2.NewClient(host, options...),
 		chainId:                     chainId,
 		builderApiKeyCreds:          builderApiKeyCreds,
 		signFn:                      signFn,

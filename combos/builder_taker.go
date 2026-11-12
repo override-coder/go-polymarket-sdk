@@ -36,14 +36,14 @@ type BuilderTakerClient struct {
 // during Polymarket builder onboarding. An empty host uses the official
 // production gateway. The host must not include /v1/builder/rfq, which is
 // added by the client.
-func NewBuilderTakerClient(host string, chainID *big.Int, signFn signing.SignatureFunc) *BuilderTakerClient {
+func NewBuilderTakerClient(host string, chainID *big.Int, signFn signing.SignatureFunc, options ...http2.Option) *BuilderTakerClient {
 	host = strings.TrimRight(strings.TrimSpace(host), "/")
 	if host == "" {
 		host = DefaultBuilderTakerGatewayHost
 	}
 	return &BuilderTakerClient{
 		host:    host,
-		client:  http2.NewClient(host),
+		client:  http2.NewClient(host, options...),
 		builder: NewOrderBuilder(chainID, signFn),
 	}
 }

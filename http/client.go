@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"net/http"
@@ -11,20 +12,54 @@ import (
 )
 
 type Client struct {
-	client *resty.Client
+	client            *resty.Client
+	terminalTransport bool
 }
 
-func NewClient(host string) *Client {
+// Option configures a client before it is used concurrently.
+type Option func(*resty.Client)
+
+// WithTransport injects an HTTP transport without changing other client defaults.
+// Errors implementing Retryable() bool with false stop this request's retries.
+func WithTransport(transport http.RoundTripper) Option {
+	return func(c *resty.Client) {
+		if transport != nil {
+			c.SetTransport(terminalErrorTransport{transport})
+		}
+	}
+}
+
+type retryCancelKey struct{}
+type terminalErrorTransport struct{ http.RoundTripper }
+
+func (t terminalErrorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.RoundTripper.RoundTrip(req)
+	var terminal interface{ Retryable() bool }
+	if errors.As(err, &terminal) && !terminal.Retryable() {
+		if cancel, ok := req.Context().Value(retryCancelKey{}).(context.CancelFunc); ok {
+			// Cancel only the SDK-owned child context. Resty checks it before
+			// retrying, preserving its existing policy for every other error.
+			cancel()
+		}
+	}
+	return resp, err
+}
+
+func NewClient(host string, options ...Option) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
-	return &Client{client: resty.New().
+	c := resty.New().
 		SetBaseURL(host).
 		SetTimeout(15 * time.Second).
 		SetRetryCount(2).
 		SetRetryWaitTime(300 * time.Millisecond).
-		SetRetryMaxWaitTime(3 * time.Second),
+		SetRetryMaxWaitTime(3 * time.Second)
+	for _, option := range options {
+		option(c)
 	}
+	_, terminalTransport := c.GetClient().Transport.(terminalErrorTransport)
+	return &Client{client: c, terminalTransport: terminalTransport}
 }
 
 type RequestOptions struct {
@@ -46,6 +81,14 @@ func (c *Client) newRequest(ctx context.Context) *resty.Request {
 }
 
 func (c *Client) DoRequest(ctx context.Context, method, endpoint string, opt *RequestOptions, out any) (*resty.Response, error) {
+	if c.terminalTransport {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		requestCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		ctx = context.WithValue(requestCtx, retryCancelKey{}, cancel)
+	}
 	rc := c.newRequest(ctx)
 	if opt != nil {
 		if opt.Headers != nil {

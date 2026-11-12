@@ -18,12 +18,12 @@ type Client struct {
 	chainId *big.Int
 }
 
-func NewClient(host string, chainId *big.Int) *Client {
+func NewClient(host string, chainId *big.Int, options ...http2.Option) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
 	return &Client{
-		client:  http2.NewClient(host),
+		client:  http2.NewClient(host, options...),
 		chainId: chainId,
 	}
 }

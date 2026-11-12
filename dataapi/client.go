@@ -22,11 +22,11 @@ type Client struct {
 
 const defaultClobHost = "https://clob.polymarket.com"
 
-func NewClient(host string, chainId *big.Int) *Client {
-	return NewClientWithClobHost(host, defaultClobHost, chainId)
+func NewClient(host string, chainId *big.Int, options ...http2.Option) *Client {
+	return NewClientWithClobHost(host, defaultClobHost, chainId, options...)
 }
 
-func NewClientWithClobHost(host, clobHost string, chainId *big.Int) *Client {
+func NewClientWithClobHost(host, clobHost string, chainId *big.Int, options ...http2.Option) *Client {
 	if strings.HasSuffix(host, "/") {
 		host = host[:len(host)-1]
 	}
@@ -34,8 +34,8 @@ func NewClientWithClobHost(host, clobHost string, chainId *big.Int) *Client {
 		clobHost = clobHost[:len(clobHost)-1]
 	}
 	return &Client{
-		client:     http2.NewClient(host),
-		clobClient: http2.NewClient(clobHost),
+		client:     http2.NewClient(host, options...),
+		clobClient: http2.NewClient(clobHost, options...),
 		chainId:    chainId,
 	}
 }
