@@ -11,6 +11,7 @@ import (
 
 	clobtypes "github.com/override-coder/go-polymarket-sdk/clob/types"
 	combostypes "github.com/override-coder/go-polymarket-sdk/combos/types"
+	"github.com/override-coder/go-polymarket-sdk/dataapi"
 	sdkheaders "github.com/override-coder/go-polymarket-sdk/headers"
 	http2 "github.com/override-coder/go-polymarket-sdk/http"
 	"github.com/override-coder/go-polymarket-sdk/signing"
@@ -24,7 +25,7 @@ const (
 
 type Client struct {
 	rfqClient  *http2.Client
-	dataClient *http2.Client
+	dataClient *dataapi.Client
 
 	chainID *big.Int
 	signFn  signing.SignatureFunc
@@ -47,7 +48,7 @@ func NewClientWithDataHost(rfqHost, dataHost string, chainID *big.Int, signFn si
 
 	return &Client{
 		rfqClient:  http2.NewClient(rfqHost),
-		dataClient: http2.NewClient(dataHost),
+		dataClient: dataapi.NewClient(dataHost, chainID),
 		chainID:    chainID,
 		signFn:     signFn,
 		builder:    NewOrderBuilder(chainID, signFn),
@@ -125,72 +126,15 @@ func (c *Client) DeclineQuote(ctx context.Context, req combostypes.ConfirmationR
 	return &out, nil
 }
 
+// GetComboPositions uses the same V2 contract as dataapi.Client.GetComboPositions.
+// Read Data and Pagination.NextCursor; V1 offsets and market IDs are unsupported.
 func (c *Client) GetComboPositions(ctx context.Context, q combostypes.ComboPositionsQuery) (*combostypes.ComboPositionsResponse, error) {
-	if strings.TrimSpace(q.User) == "" {
-		return nil, fmt.Errorf("user is required")
-	}
-	params := map[string]any{"user": q.User}
-	if q.Status != nil && *q.Status != "" {
-		params["status"] = *q.Status
-	}
-	if q.Sort != nil && *q.Sort != "" {
-		params["sort"] = *q.Sort
-	}
-	if len(q.MarketID) > 0 {
-		params["market_id"] = strings.Join(q.MarketID, ",")
-	}
-	if q.Limit != nil {
-		if *q.Limit < 1 || *q.Limit > 100 {
-			return nil, fmt.Errorf("limit out of range (1..100)")
-		}
-		params["limit"] = *q.Limit
-	}
-	if q.Offset != nil {
-		if *q.Offset < 0 {
-			return nil, fmt.Errorf("offset must be >= 0")
-		}
-		params["offset"] = *q.Offset
-	}
-
-	var out combostypes.ComboPositionsResponse
-	resp, err := c.dataClient.DoRequest(ctx, http.MethodGet, combostypes.GetComboPositions, &http2.RequestOptions{
-		Params: params,
-	}, &out)
-	if _, e := http2.ParseHTTPError(resp, err); e != nil {
-		return nil, e
-	}
-	return &out, nil
+	return c.dataClient.GetComboPositions(ctx, q)
 }
 
+// GetComboActivity reads the V2 feed. Keep User and Condition on every page.
 func (c *Client) GetComboActivity(ctx context.Context, q combostypes.ComboActivityQuery) (*combostypes.ComboActivityResponse, error) {
-	if strings.TrimSpace(q.User) == "" {
-		return nil, fmt.Errorf("user is required")
-	}
-	params := map[string]any{"user": q.User}
-	if len(q.MarketID) > 0 {
-		params["market_id"] = strings.Join(q.MarketID, ",")
-	}
-	if q.Limit != nil {
-		if *q.Limit < 1 || *q.Limit > 500 {
-			return nil, fmt.Errorf("limit out of range (1..500)")
-		}
-		params["limit"] = *q.Limit
-	}
-	if q.Offset != nil {
-		if *q.Offset < 0 {
-			return nil, fmt.Errorf("offset must be >= 0")
-		}
-		params["offset"] = *q.Offset
-	}
-
-	var out combostypes.ComboActivityResponse
-	resp, err := c.dataClient.DoRequest(ctx, http.MethodGet, combostypes.GetComboActivity, &http2.RequestOptions{
-		Params: params,
-	}, &out)
-	if _, e := http2.ParseHTTPError(resp, err); e != nil {
-		return nil, e
-	}
-	return &out, nil
+	return c.dataClient.GetComboActivity(ctx, q)
 }
 
 func (c *Client) doL2(ctx context.Context, method, path string, body any, option *sdktypes.AuthOption, out any) error {

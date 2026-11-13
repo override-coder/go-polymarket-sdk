@@ -1,5 +1,7 @@
 package types
 
+import datatypes "github.com/override-coder/go-polymarket-sdk/dataapi/types"
+
 const (
 	GetComboMarkets = "/v1/rfq/combo-markets"
 
@@ -7,8 +9,8 @@ const (
 	CancelQuote  = "/v1/maker/quotes/cancel"
 	ConfirmQuote = "/v1/maker/confirmations"
 
-	GetComboPositions = "/v1/positions/combos"
-	GetComboActivity  = "/v1/activity/combos"
+	GetComboPositions = datatypes.GET_COMBO_POSITIONS
+	GetComboActivity  = datatypes.GET_COMBO_ACTIVITY
 
 	CreateBuilderRFQ = "/v1/builder/rfq/requests"
 

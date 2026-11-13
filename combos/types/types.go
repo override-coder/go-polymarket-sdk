@@ -1,6 +1,9 @@
 package types
 
-import "github.com/polymarket/go-order-utils/pkg/model"
+import (
+	datatypes "github.com/override-coder/go-polymarket-sdk/dataapi/types"
+	"github.com/polymarket/go-order-utils/pkg/model"
+)
 
 const (
 	Bytes32Zero = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -389,69 +392,13 @@ type MakerConfirmation struct {
 	RespondedAt   int64  `json:"responded_at,omitempty"`
 }
 
-type ComboPositionsQuery struct {
-	User     string
-	Status   *string
-	Sort     *string
-	MarketID []string
-	Limit    *int
-	Offset   *int
-}
-
-type ComboPositionsResponse struct {
-	Combos     []ComboPosition `json:"combos"`
-	Pagination Pagination      `json:"pagination"`
-}
-
-type ComboPosition struct {
-	ComboConditionID   string     `json:"combo_condition_id"`
-	ComboPositionID    string     `json:"combo_position_id"`
-	ModuleID           string     `json:"module_id"`
-	UserAddress        string     `json:"user_address"`
-	SharesBalance      string     `json:"shares_balance"`
-	EntryAvgPriceUSDC  string     `json:"entry_avg_price_usdc"`
-	EntryCostUSDC      string     `json:"entry_cost_usdc"`
-	RealizedPayoutUSDC string     `json:"realized_payout_usdc"`
-	TotalCostUSDC      string     `json:"total_cost_usdc"`
-	Legs               []ComboLeg `json:"legs"`
-}
-
-type ComboActivityQuery struct {
-	User     string
-	MarketID []string
-	Limit    *int
-	Offset   *int
-}
-
-type ComboActivityResponse struct {
-	Activity   []ComboActivity `json:"activity"`
-	Pagination Pagination      `json:"pagination"`
-}
-
-type ComboActivity struct {
-	ID               string     `json:"id"`
-	EventKind        string     `json:"event_kind"`
-	ModuleKind       string     `json:"module_kind"`
-	UserAddress      string     `json:"user_address"`
-	ComboConditionID string     `json:"combo_condition_id"`
-	ComboPositionID  string     `json:"combo_position_id"`
-	AmountUSDC       string     `json:"amount_usdc"`
-	PayoutUSDC       string     `json:"payout_usdc"`
-	Timestamp        int64      `json:"timestamp"`
-	TxHash           string     `json:"tx_hash"`
-	Legs             []ComboLeg `json:"legs"`
-}
-
-type ComboLeg struct {
-	ConditionID string `json:"condition_id"`
-	PositionID  string `json:"position_id"`
-	Outcome     string `json:"outcome"`
-	Title       string `json:"title,omitempty"`
-	Slug        string `json:"slug,omitempty"`
-}
-
-type Pagination struct {
-	Limit  int `json:"limit"`
-	Offset int `json:"offset"`
-	Total  int `json:"total"`
-}
+// Combo read types share the canonical Data API V2 contract. This migration
+// replaces V1 offsets, market IDs, list wrappers and row fields (see docs/combo_data_v2.md).
+type ComboPositionsQuery = datatypes.ComboPositionsQuery
+type ComboPositionsResponse = datatypes.Page[datatypes.ComboPosition]
+type ComboPosition = datatypes.ComboPosition
+type ComboActivityQuery = datatypes.ComboActivityQuery
+type ComboActivityResponse = datatypes.Page[datatypes.ComboActivity]
+type ComboActivity = datatypes.ComboActivity
+type ComboLeg = datatypes.ComboLeg
+type Pagination = datatypes.Pagination

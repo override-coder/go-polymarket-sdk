@@ -1,6 +1,7 @@
 package types
 
 const (
+	GET_COMBO_ACTIVITY   = "/v2/activity/combos"
 	GET_COMBO_POSITIONS  = "/v2/positions/combos"
 	GET_POSITIONS        = "/v2/positions"
 	GET_CLOSED_POSITIONS = "/v2/positions" // Requires status=CLOSED.
