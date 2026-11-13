@@ -16,8 +16,8 @@ import (
 func TestResolveTransactionsHashesUsesTradeIDs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path != clobtypes.GET_TRADES {
-			t.Fatalf("request path = %s, want %s", r.URL.Path, clobtypes.GET_TRADES)
+		if r.URL.Path != "/data/trades" {
+			t.Fatalf("request path = %s, want /data/trades", r.URL.Path)
 		}
 		if tradeID := r.URL.Query().Get("id"); tradeID != "trade-1" {
 			t.Fatalf("trade id = %q, want %q", tradeID, "trade-1")

@@ -79,7 +79,7 @@ const (
 
 	GET_OPEN_ORDERS = "/data/orders"
 
-	GET_TRADES = "/trades"
+	GET_TRADES = "/data/trades"
 
 	IS_ORDER_SCORING = "/order-scoring"
 

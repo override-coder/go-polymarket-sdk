@@ -34,3 +34,11 @@ env -u GOROOT go build ./...
 
 No live credentials, submissions or cancellations are used by these tests.
 Consumer fill discovery and reconciliation changes are separate downstream work.
+
+## Canonical trade route correction
+
+GetTrades and POST trade-ID hash resolution use the documented `/data/trades`
+path for both the HTTP request and HMAC signature. The query pagination test
+asserts the literal path and independently computes the HMAC with the standard
+library; it does not derive expected behavior from the SDK endpoint constant.
+The by-ID resolution regression also asserts the literal path.

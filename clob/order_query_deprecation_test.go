@@ -2,6 +2,9 @@ package clob
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -82,8 +85,15 @@ func TestTradeQueryFiltersPaginationAndOrderRelations(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.Method != http.MethodGet || r.URL.Path != clobtypes.GET_TRADES {
+		if r.Method != http.MethodGet || r.URL.Path != "/data/trades" {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		// Assert the documented path and its HMAC independently from SDK constants
+		// and signing helpers. Query parameters are not part of the signed path.
+		mac := hmac.New(sha256.New, []byte("secret"))
+		mac.Write([]byte(r.Header.Get("POLY_TIMESTAMP") + "GET/data/trades"))
+		if want := base64.URLEncoding.EncodeToString(mac.Sum(nil)); r.Header.Get("POLY_SIGNATURE") != want {
+			t.Errorf("trade signature does not cover the documented path")
 		}
 		q := r.URL.Query()
 		for key, want := range map[string]string{"market": market, "asset_id": asset, "before": before, "after": after, "maker_address": "wallet"} {
