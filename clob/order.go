@@ -14,6 +14,7 @@ import (
 	"github.com/polymarket/go-order-utils/pkg/model"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -178,6 +179,9 @@ func (c *Client) GetOrder(ctx context.Context, orderId string, req types.GetOrde
 }
 
 func (c *Client) GetOrders(ctx context.Context, req types.GetActiveOrdersRequest, option *sdktypes.AuthOption) (*types.OpenOrders, error) {
+	if req.AssetID != "" && strings.TrimSpace(req.Market) == "" {
+		return nil, errors.New("asset_id requires market")
+	}
 	ts := time.Now().Unix()
 	l2HeaderArgs := types.L2HeaderArgs{
 		Method:      http.MethodGet,

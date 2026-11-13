@@ -251,6 +251,7 @@ type GetOrderRequest struct {
 
 // OpenOrder 对象
 type OpenOrder struct {
+	// Deprecated: CLOB no longer guarantees this field. Use trade records to track fills; an empty list does not prove no fills.
 	AssociateTrades []string `json:"associate_trades"`
 	ID              string   `json:"id"`
 	Status          string   `json:"status"`
@@ -268,8 +269,9 @@ type OpenOrder struct {
 }
 
 type GetActiveOrdersRequest struct {
-	ID      string `json:"id,omitempty" url:"id,omitempty"`
-	Market  string `json:"market,omitempty" url:"market,omitempty"`
+	ID     string `json:"id,omitempty" url:"id,omitempty"`
+	Market string `json:"market,omitempty" url:"market,omitempty"`
+	// AssetID requires a nonblank Market (condition ID).
 	AssetID string `json:"asset_id,omitempty" url:"asset_id,omitempty"`
 }
 
