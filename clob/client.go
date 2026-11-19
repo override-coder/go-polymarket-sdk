@@ -249,26 +249,38 @@ func (c *Client) GetBuilderFee(ctx context.Context, builderCode string) (string,
 	return resp["builder_maker_fee_rate_bps"], resp["builder_taker_fee_rate_bps"], nil
 }
 
+// GetMarketPrices returns one requested side per asset.
+// Requests for both sides of one asset cannot fit this legacy result type.
+// Use GetMarketPricesBySide for those requests.
 func (c *Client) GetMarketPrices(ctx context.Context, prices []types.PricesRequest) (map[string]string, error) {
-	var resp map[string]map[string]string
-	res, err := c.client.DoRequest(ctx, http.MethodPost, types.GET_PRICES, &http2.RequestOptions{
-		Data: prices,
-	}, &resp)
-	if _, e := http2.ParseHTTPError(res, err); e != nil {
-		return nil, errors.Wrap(e, "get market price")
+	sides := make(map[string]string, len(prices))
+	for _, request := range prices {
+		if side, ok := sides[request.TokenId]; ok && side != request.Side {
+			return nil, fmt.Errorf("multiple sides for asset %s: use GetMarketPricesBySide", request.TokenId)
+		}
+		sides[request.TokenId] = request.Side
+	}
+	response, err := c.GetMarketPricesBySide(ctx, prices)
+	if err != nil {
+		return nil, err
 	}
 	out := make(map[string]string, len(prices))
-	for _, id := range prices {
-		if sideMap, ok := resp[id.TokenId]; ok {
-			if price, found := sideMap["BUY"]; found {
-				out[id.TokenId] = price
-			}
-			if price, found := sideMap["SELL"]; found {
-				out[id.TokenId] = price
-			}
+	for token, side := range sides {
+		if price, ok := response[token][side]; ok {
+			out[token] = price
 		}
 	}
 	return out, nil
+}
+
+// GetMarketPricesBySide preserves the asset -> BUY/SELL -> decimal price response.
+func (c *Client) GetMarketPricesBySide(ctx context.Context, prices []types.PricesRequest) (map[string]map[string]string, error) {
+	var response map[string]map[string]string
+	res, err := c.client.DoRequest(ctx, http.MethodPost, types.GET_PRICES, &http2.RequestOptions{Data: prices}, &response)
+	if _, e := http2.ParseHTTPError(res, err); e != nil {
+		return nil, errors.Wrap(e, "get market prices")
+	}
+	return response, nil
 }
 
 func (c *Client) GetLastTradePrices(ctx context.Context, prices []types.LastTradePriceRequest) ([]types.LastTradePrice, error) {
