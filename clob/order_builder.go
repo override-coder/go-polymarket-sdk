@@ -80,10 +80,6 @@ func (o *OrderBuilder) buildOrder(order types.UserOrder, orderType types.OrderTy
 	return o.createOrder(order, orderType, options)
 }
 
-func (o *OrderBuilder) buildOrderV2(order types.UserOrderV2, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrderV2, error) {
-	return o.createOrderV2(order, orderType, options)
-}
-
 func (o *OrderBuilder) createOrder(order types.UserOrder, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrder, error) {
 	orderData := o.buildOrderCreationArgs(order, orderType, roundConfigForTickSize(options.TickSize), options.AuthOption)
 	exchangeContract := model.CTFExchange
@@ -93,13 +89,9 @@ func (o *OrderBuilder) createOrder(order types.UserOrder, orderType types.OrderT
 	return buildOrder(o.signFn, exchangeContract, o.chaindId, orderData)
 }
 
-func (o *OrderBuilder) createOrderV2(order types.UserOrderV2, orderType types.OrderType, options types.CreateOrderOptions) (*model.SignedOrderV2, error) {
-	orderData := o.buildOrderCreationArgsV2(order, orderType, roundConfigForTickSize(options.TickSize), options.AuthOption)
-	exchangeContract := model.CTFExchange
-	if options.NegRisk {
-		exchangeContract = model.NegRiskCTFExchange
-	}
-	return buildOrderV2(options.AuthOption.SingerAddress, o.signFn, exchangeContract, o.chaindId, orderData)
+func (o *OrderBuilder) buildOrderV2(order types.UserOrderV2, orderType types.OrderType, tickSize types.TickSize, contract model.VerifyingContract, auth *sdktypes.AuthOption) (*model.SignedOrderV2, error) {
+	orderData := o.buildOrderCreationArgsV2(order, orderType, roundConfigForTickSize(tickSize), auth)
+	return buildOrderV2(auth.SingerAddress, o.signFn, contract, o.chaindId, orderData)
 }
 
 func roundConfigForTickSize(tickSize types.TickSize) RoundConfig {

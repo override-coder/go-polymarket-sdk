@@ -131,6 +131,7 @@ type CreateOrderOptions struct {
 }
 
 type UserOrderV2 struct {
+	// TokenId is the CTF token ID or Protocol V2 position ID used to route and sign the order.
 	TokenId         string   `json:"tokenId"`
 	ConditionId     *string  `json:"condition_id,omitempty"`
 	Price           float64  `json:"price"`

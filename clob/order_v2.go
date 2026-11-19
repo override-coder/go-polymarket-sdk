@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cockroachdb/errors"
@@ -19,8 +20,11 @@ import (
 	"github.com/polymarket/go-order-utils/pkg/model"
 )
 
+// Protocol V2 reserves bits 40 through 103 of the uint256 position ID.
+var v2PositionReservedBits = new(big.Int).Lsh(new(big.Int).SetUint64(math.MaxUint64), 40)
+
 func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2, orderType types.OrderType, postOnly, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
-	tokenID := userOrder.TokenId
+	tokenID := strings.TrimSpace(userOrder.TokenId)
 
 	err := c.ensureMarketInfoCached(ctx, tokenID, userOrder.ConditionId)
 	if err != nil {
@@ -54,32 +58,54 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 		}
 	}
 
-	userOrder.Price = normalizedPrice
-
-	negRisk := false
-	if userOrder.NegRisk != nil {
-		negRisk = *userOrder.NegRisk
-	} else {
-		risk, err := c.GetNegRisk(ctx, tokenID)
-		if err != nil {
-			return nil, errors.WithMessage(err, "create order get negRisk")
+	assetID, err := parseOrderAssetID(tokenID)
+	if err != nil {
+		return nil, err
+	}
+	contract := model.ExchangeV3
+	if new(big.Int).And(assetID, v2PositionReservedBits).Sign() != 0 {
+		negRisk := userOrder.NegRisk
+		if negRisk == nil {
+			risk, err := c.GetNegRisk(ctx, tokenID)
+			if err != nil {
+				return nil, errors.WithMessage(err, "create order get negRisk")
+			}
+			negRisk = &risk
 		}
-		negRisk = risk
+		contract = model.CTFExchange
+		if *negRisk {
+			contract = model.NegRiskCTFExchange
+		}
 	}
 
+	userOrder.Price = normalizedPrice
 	c.adjustBuyMarketOrderAmountForFees(userOrder, tokenID, orderType)
-
-	signedOrder, err := c.orderBuilder.buildOrderV2(*userOrder, orderType, types.CreateOrderOptions{
-		AuthOption: option,
-		TickSize:   types.TickSize(tickSize),
-		NegRisk:    negRisk,
-	})
+	// The order-utils builder accepts decimal uint256s. CLOB uses the supplied asset ID.
+	signingOrder := *userOrder
+	signingOrder.TokenId = assetID.String()
+	signedOrder, err := c.orderBuilder.buildOrderV2(signingOrder, orderType, types.TickSize(tickSize), contract, option)
 	if err != nil {
 		return nil, errors.WithMessage(err, "create order buildOrder")
 	}
 
-	return c.postOrderV2(ctx, signedOrder, orderType, postOnly, deferExec, option)
+	payload := orderToJson2(signedOrder, tokenID, option.ApiKeyCreds.ApiKey, &orderType, postOnly, deferExec)
+	if contract == model.ExchangeV3 {
+		payload.Order.Signature = "0x" + payload.Order.Signature
+	}
+	return c.postOrderV2(ctx, payload, option)
+}
 
+func parseOrderAssetID(value string) (*big.Int, error) {
+	// Keep unprefixed IDs decimal, including those with leading zeros.
+	base := 10
+	if len(value) >= 2 && value[0] == '0' && strings.ContainsAny(value[1:2], "xXbBoO") {
+		base = 0
+	}
+	id, ok := new(big.Int).SetString(value, base)
+	if !ok || id.Sign() < 0 || id.BitLen() > 256 || strings.Contains(value, "_") {
+		return nil, fmt.Errorf("invalid uint256 asset ID %q", value)
+	}
+	return id, nil
 }
 
 func validateAdjustedLimitBuyUSDCBalance(userOrder *types.UserOrderV2, orderType types.OrderType, normalizedPrice float64) error {
@@ -98,8 +124,7 @@ func validateAdjustedLimitBuyUSDCBalance(userOrder *types.UserOrderV2, orderType
 	return nil
 }
 
-func (c *Client) postOrderV2(ctx context.Context, order *model.SignedOrderV2, orderType types.OrderType, postOnly, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
-	orderPayload := orderToJson2(order, option.ApiKeyCreds.ApiKey, &orderType, postOnly, deferExec)
+func (c *Client) postOrderV2(ctx context.Context, orderPayload types.NewOrderV2, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
 	bodyBytes, err := json.Marshal(orderPayload)
 	if err != nil {
 		return nil, errors.WithMessage(err, "create order post order marshal")
@@ -126,13 +151,13 @@ func (c *Client) postOrderV2(ctx context.Context, order *model.SignedOrderV2, or
 	if _, e := http2.ParseHTTPError(resp, err); e != nil {
 		return nil, e
 	}
-	if !deferExec {
+	if !orderPayload.DeferExec {
 		c.resolveTransactionsHashes(ctx, &out, option)
 	}
 	return &out, nil
 }
 
-func orderToJson2(order *model.SignedOrderV2, owner string, orderType *types.OrderType, postOnly, deferExec bool) types.NewOrderV2 {
+func orderToJson2(order *model.SignedOrderV2, tokenID, owner string, orderType *types.OrderType, postOnly, deferExec bool) types.NewOrderV2 {
 	side := types.BUY
 	if order.Side.Cmp(big.NewInt(0)) == 1 {
 		side = types.SELL
@@ -142,7 +167,7 @@ func orderToJson2(order *model.SignedOrderV2, owner string, orderType *types.Ord
 			Salt:          order.Salt.Int64(),
 			Maker:         order.Maker.String(),
 			Signer:        order.Signer.String(),
-			TokenID:       order.TokenID.String(),
+			TokenID:       tokenID,
 			MakerAmount:   order.MakerAmount.String(),
 			TakerAmount:   order.TakerAmount.String(),
 			Side:          side,

@@ -66,7 +66,7 @@ func TestLimitBuyRoundingSignedAmounts(t *testing.T) {
 			}
 			v2, err := builder.buildOrderV2(types.UserOrderV2{
 				TokenId: "1", Side: types.BUY, Price: 0.295, Size: 33.89, Expiration: &expiration,
-			}, orderType, opts)
+			}, orderType, opts.TickSize, model.ExchangeV3, opts.AuthOption)
 			if err != nil {
 				t.Fatal(err)
 			}

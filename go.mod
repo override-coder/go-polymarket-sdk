@@ -53,4 +53,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/polymarket/go-order-utils v1.22.6 => github.com/override-coder/go-order-utils v1.22.7-0.20260505081955-9eba3fb24e06
+replace github.com/polymarket/go-order-utils v1.22.6 => github.com/override-coder/go-order-utils v1.22.7-0.20261119031642-91a0e8d83f5f
