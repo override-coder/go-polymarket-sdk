@@ -58,8 +58,16 @@ func (c *Client) WithBuilderApiKeyCreds(newBuilder *sdktypes.BuilderApiKeyCreds)
 }
 
 func (c *Client) GetNonce(signerAddress string, signerType types.TransactionType) (types.NoncePayload, error) {
+	return c.GetNonceContext(context.Background(), signerAddress, signerType)
+}
+
+// GetNonceContext is the cancellable variant of GetNonce.
+func (c *Client) GetNonceContext(ctx context.Context, signerAddress string, signerType types.TransactionType) (types.NoncePayload, error) {
+	if err := ctx.Err(); err != nil {
+		return types.NoncePayload{}, err
+	}
 	var resp types.NoncePayload
-	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_NONCE, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_NONCE, &http2.RequestOptions{
 		Params: map[string]any{
 			"address": signerAddress,
 			"type":    signerType},
@@ -91,6 +99,14 @@ func (c *Client) GetTransactionContext(ctx context.Context, transactionID string
 
 // GetTransactions
 func (c *Client) GetTransactions() ([]types.RelayerTransaction, error) {
+	return c.GetTransactionsContext(context.Background())
+}
+
+// GetTransactionsContext is the cancellable variant of GetTransactions.
+func (c *Client) GetTransactionsContext(ctx context.Context) ([]types.RelayerTransaction, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	requestOptions := &http2.RequestOptions{}
 	if c.builderApiKeyCreds != nil {
 		ts := time.Now().Unix()
@@ -100,12 +116,13 @@ func (c *Client) GetTransactions() ([]types.RelayerTransaction, error) {
 			Body:        ``,
 		}
 		builderHeaders, errBuilder := sdkheaders.CreateL2BuilderHeaders(c.builderApiKeyCreds, l2HeaderArgs, &ts)
-		if errBuilder == nil && len(builderHeaders) != 0 {
-			requestOptions.Headers = builderHeaders
+		if errBuilder != nil {
+			return nil, fmt.Errorf("get transactions: create builder headers: %w", errBuilder)
 		}
+		requestOptions.Headers = builderHeaders
 	}
 	var resp []types.RelayerTransaction
-	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_TRANSACTIONS, requestOptions, &resp)
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_TRANSACTIONS, requestOptions, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
 		return nil, e
 	}
@@ -113,6 +130,14 @@ func (c *Client) GetTransactions() ([]types.RelayerTransaction, error) {
 }
 
 func (c *Client) Deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	return c.DeployContext(context.Background(), option)
+}
+
+// DeployContext is the cancellable variant of Deploy.
+func (c *Client) DeployContext(ctx context.Context, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.resolveBuilderAPIKeyCreds(option) == nil {
 		return nil, fmt.Errorf("builder API credentials are required")
 	}
@@ -127,7 +152,7 @@ func (c *Client) Deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 		return nil, errors.WithMessagef(err, "deploy getExpectedSafe signer:%v", option.SingerAddress)
 	}
 
-	deployed, err := c.GetDeployed(safeAddr)
+	deployed, err := c.GetDeployedContext(ctx, safeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("deploy: GetDeployed failed: %w", err)
 	}
@@ -137,7 +162,7 @@ func (c *Client) Deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 
 	fmt.Printf("Deploying safe %s...\n", safeAddr)
 
-	resp, err := c.deploy(option)
+	resp, err := c.deploy(ctx, option)
 	if err != nil {
 		return nil, fmt.Errorf("deploy: deployInternal failed: %w", err)
 	}
@@ -153,7 +178,7 @@ func (c *Client) GetExpectedSafe(ownerAddr string) (string, error) {
 	return safeAddr, nil
 }
 
-func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+func (c *Client) deploy(ctx context.Context, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
 	start := time.Now()
 
 	from := option.SingerAddress
@@ -165,6 +190,9 @@ func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 		PaymentReceiver: sdktypes.ZeroAddress,
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	reqBody, err := buildSafeCreateTransactionRequest(c.chainId, c.signFn, c.contractConfig.SafeFactory, args)
 	if err != nil {
 		return nil, fmt.Errorf("deployInternal: build request failed: %w", err)
@@ -189,7 +217,7 @@ func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 	}
 
 	var out types.RelayerTransactionResponse
-	resp, err := c.client.DoRequest(context.Background(), http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(ctx, http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
 		Headers: headers,
 		Data:    body,
 	}, &out)
@@ -200,6 +228,14 @@ func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 }
 
 func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	return c.ExecuteContext(context.Background(), txns, metadata, option)
+}
+
+// ExecuteContext is the cancellable variant of Execute.
+func (c *Client) ExecuteContext(ctx context.Context, txns []types.SafeTransaction, metadata string, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.resolveBuilderAPIKeyCreds(option) == nil {
 		return nil, fmt.Errorf("builder API credentials are required")
 	}
@@ -219,7 +255,7 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 		return nil, fmt.Errorf("execute: GetExpectedSafe failed: %w", err)
 	}
 
-	deployed, err := c.GetDeployed(safeAddr)
+	deployed, err := c.GetDeployedContext(ctx, safeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("execute: GetDeployed failed: %w", err)
 	}
@@ -227,7 +263,7 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 		return nil, fmt.Errorf("execute: safe not deployed")
 	}
 
-	noncePayload, err := c.GetNonce(from, types.TransactionTypeSAFE)
+	noncePayload, err := c.GetNonceContext(ctx, from, types.TransactionTypeSAFE)
 	if err != nil {
 		return nil, fmt.Errorf("execute: GetNonce failed: %w", err)
 	}
@@ -239,6 +275,9 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 		Transactions: txns,
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	reqBody, err := buildSafeTransactionRequest(c.signFn, args, c.contractConfig, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("execute: build safe transaction r	equest failed: %w", err)
@@ -263,7 +302,7 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 	}
 
 	var out types.RelayerTransactionResponse
-	resp, err := c.client.DoRequest(context.Background(), http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(ctx, http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
 		Headers: headers,
 		Data:    body,
 	}, &out)
@@ -274,13 +313,21 @@ func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *
 }
 
 func (c *Client) GetDeployed(address string, txType ...types.TransactionType) (types.GetDeployedResponse, error) {
+	return c.GetDeployedContext(context.Background(), address, txType...)
+}
+
+// GetDeployedContext is the cancellable variant of GetDeployed.
+func (c *Client) GetDeployedContext(ctx context.Context, address string, txType ...types.TransactionType) (types.GetDeployedResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return types.GetDeployedResponse{}, err
+	}
 	var resp types.GetDeployedResponse
 	params := map[string]any{"address": address}
 	if len(txType) > 0 && txType[0] != "" {
 		params["type"] = txType[0]
 	}
 
-	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_DEPLOYED, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_DEPLOYED, &http2.RequestOptions{
 		Params: params,
 	}, &resp)
 	if _, e := http2.ParseHTTPError(res, err); e != nil {
@@ -347,6 +394,14 @@ func (c *Client) PollUntilState(
 }
 
 func (c *Client) BuildDeployTx(option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	return c.BuildDeployTxContext(context.Background(), option)
+}
+
+// BuildDeployTxContext is the cancellable variant of BuildDeployTx.
+func (c *Client) BuildDeployTxContext(ctx context.Context, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if option == nil {
 		return nil, fmt.Errorf("auth option is required")
 	}
@@ -358,7 +413,7 @@ func (c *Client) BuildDeployTx(option *sdktypes.AuthOption) (*types.TransactionR
 		return nil, errors.WithMessagef(err, "deploy getExpectedSafe signer:%v", option.SingerAddress)
 	}
 
-	deployed, err := c.GetDeployed(safeAddr)
+	deployed, err := c.GetDeployedContext(ctx, safeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("deploy: GetDeployed failed: %w", err)
 	}
@@ -377,6 +432,9 @@ func (c *Client) BuildDeployTx(option *sdktypes.AuthOption) (*types.TransactionR
 		PaymentReceiver: sdktypes.ZeroAddress,
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	reqBody, err := buildSafeCreateTransactionRequest(c.chainId, c.signFn, c.contractConfig.SafeFactory, args)
 	if err != nil {
 		return nil, fmt.Errorf("deployInternal: build request failed: %w", err)
@@ -386,6 +444,14 @@ func (c *Client) BuildDeployTx(option *sdktypes.AuthOption) (*types.TransactionR
 }
 
 func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadata string, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	return c.BuildTxContext(context.Background(), txns, nonceAt, metadata, option)
+}
+
+// BuildTxContext is the cancellable variant of BuildTx.
+func (c *Client) BuildTxContext(ctx context.Context, txns []types.SafeTransaction, nonceAt *big.Int, metadata string, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if option == nil {
 		return nil, fmt.Errorf("auth option is required")
 	}
@@ -404,7 +470,7 @@ func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadat
 		return nil, fmt.Errorf("execute: GetExpectedSafe failed: %w", err)
 	}
 
-	deployed, err := c.GetDeployed(safeAddr)
+	deployed, err := c.GetDeployedContext(ctx, safeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("execute: GetDeployed failed: %w", err)
 	}
@@ -414,7 +480,7 @@ func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadat
 
 	nonce := nonceAt.String()
 	if nonceAt.Cmp(big.NewInt(0)) == 0 {
-		noncePayload, err := c.GetNonce(from, types.TransactionTypeSAFE)
+		noncePayload, err := c.GetNonceContext(ctx, from, types.TransactionTypeSAFE)
 		if err != nil {
 			return nil, fmt.Errorf("execute: GetNonce failed: %w", err)
 		}
@@ -428,6 +494,9 @@ func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadat
 		Transactions: txns,
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	reqBody, err := buildSafeTransactionRequest(c.signFn, args, c.contractConfig, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("execute: build safe transaction r	equest failed: %w", err)
@@ -437,6 +506,14 @@ func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadat
 }
 
 func (c *Client) ExecuteByTx(reqBody *types.TransactionRequest, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	return c.ExecuteByTxContext(context.Background(), reqBody, option)
+}
+
+// ExecuteByTxContext is the cancellable variant of ExecuteByTx.
+func (c *Client) ExecuteByTxContext(ctx context.Context, reqBody *types.TransactionRequest, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.resolveBuilderAPIKeyCreds(option) == nil {
 		return nil, fmt.Errorf("builder API credentials are required")
 	}
@@ -453,7 +530,7 @@ func (c *Client) ExecuteByTx(reqBody *types.TransactionRequest, option *sdktypes
 		return nil, fmt.Errorf("execute: GetExpectedSafe failed: %w", err)
 	}
 
-	deployed, err := c.GetDeployed(safeAddr)
+	deployed, err := c.GetDeployedContext(ctx, safeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("execute: GetDeployed failed: %w", err)
 	}
@@ -480,7 +557,7 @@ func (c *Client) ExecuteByTx(reqBody *types.TransactionRequest, option *sdktypes
 	}
 
 	var out types.RelayerTransactionResponse
-	resp, err := c.client.DoRequest(context.Background(), http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
+	resp, err := c.client.DoRequest(ctx, http.MethodPost, types.SUBMIT_TRANSACTION, &http2.RequestOptions{
 		Headers: headers,
 		Data:    body,
 	}, &out)
@@ -523,6 +600,14 @@ func (c *Client) GetExpectedBeaconDepositWallet(ownerAddr string) (string, error
 }
 
 func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	return c.DeployDepositWalletContext(context.Background(), option)
+}
+
+// DeployDepositWalletContext is the cancellable variant of DeployDepositWallet.
+func (c *Client) DeployDepositWalletContext(ctx context.Context, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.resolveBuilderAPIKeyCreds(option) == nil {
 		return nil, fmt.Errorf("builder API credentials are required")
 	}
@@ -540,7 +625,7 @@ func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.Relaye
 		To:   depositWalletConfig.DepositWalletFactory,
 	}
 
-	return c.submitTransaction(reqBody, option, "deploy deposit wallet")
+	return c.submitTransaction(ctx, reqBody, option, "deploy deposit wallet")
 }
 
 func (c *Client) BuildDepositWalletBatch(
@@ -550,6 +635,18 @@ func (c *Client) BuildDepositWalletBatch(
 	useBeaconDepositWallet *bool,
 	option *sdktypes.AuthOption,
 ) (*types.DepositWalletBatchRequest, error) {
+	return c.BuildDepositWalletBatchContext(context.Background(), calls, deadline, nonceAt, useBeaconDepositWallet, option)
+}
+
+// BuildDepositWalletBatchContext is the cancellable variant of BuildDepositWalletBatch.
+func (c *Client) BuildDepositWalletBatchContext(ctx context.Context, calls []types.DepositWalletCall,
+	deadline string,
+	nonceAt *string,
+	useBeaconDepositWallet *bool,
+	option *sdktypes.AuthOption) (*types.DepositWalletBatchRequest, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if option == nil {
 		return nil, fmt.Errorf("auth option is required")
 	}
@@ -587,7 +684,7 @@ func (c *Client) BuildDepositWalletBatch(
 
 	nonce := big.NewInt(0).String()
 	if nonceAt == nil || utils.StringToDecimal(*nonceAt).BigInt().Cmp(big.NewInt(0)) == 0 {
-		noncePayload, err := c.GetNonce(from, types.TransactionTypeWALLET)
+		noncePayload, err := c.GetNonceContext(ctx, from, types.TransactionTypeWALLET)
 		if err != nil {
 			return nil, fmt.Errorf("execute: GetNonce failed: %w", err)
 		}
@@ -605,6 +702,9 @@ func (c *Client) BuildDepositWalletBatch(
 		Calls:         calls,
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	reqBody, err := buildDepositWalletBatchRequest(c.signFn, args, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("build deposit wallet batch: build request failed: %w", err)
@@ -626,6 +726,17 @@ func (c *Client) ExecuteDepositWalletBatch(
 	useBeaconDepositWallet *bool,
 	option *sdktypes.AuthOption,
 ) (*types.RelayerTransactionResponse, error) {
+	return c.ExecuteDepositWalletBatchContext(context.Background(), calls, deadline, useBeaconDepositWallet, option)
+}
+
+// ExecuteDepositWalletBatchContext is the cancellable variant of ExecuteDepositWalletBatch.
+func (c *Client) ExecuteDepositWalletBatchContext(ctx context.Context, calls []types.DepositWalletCall,
+	deadline string,
+	useBeaconDepositWallet *bool,
+	option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.resolveBuilderAPIKeyCreds(option) == nil {
 		return nil, fmt.Errorf("builder API credentials are required")
 	}
@@ -633,18 +744,27 @@ func (c *Client) ExecuteDepositWalletBatch(
 		return nil, fmt.Errorf("execute deposit wallet batch: nil auth option")
 	}
 
-	reqBody, err := c.BuildDepositWalletBatch(calls, deadline, nil, useBeaconDepositWallet, option)
+	reqBody, err := c.BuildDepositWalletBatchContext(ctx, calls, deadline, nil, useBeaconDepositWallet, option)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.submitTransaction(reqBody, option, "execute deposit wallet batch")
+	return c.submitTransaction(ctx, reqBody, option, "execute deposit wallet batch")
 }
 
 func (c *Client) ExecuteDepositWalletBatchByTx(
 	reqBody *types.DepositWalletBatchRequest,
 	option *sdktypes.AuthOption,
 ) (*types.RelayerTransactionResponse, error) {
+	return c.ExecuteDepositWalletBatchByTxContext(context.Background(), reqBody, option)
+}
+
+// ExecuteDepositWalletBatchByTxContext is the cancellable variant of ExecuteDepositWalletBatchByTx.
+func (c *Client) ExecuteDepositWalletBatchByTxContext(ctx context.Context, reqBody *types.DepositWalletBatchRequest,
+	option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.resolveBuilderAPIKeyCreds(option) == nil {
 		return nil, fmt.Errorf("builder API credentials are required")
 	}
@@ -655,10 +775,11 @@ func (c *Client) ExecuteDepositWalletBatchByTx(
 		return nil, fmt.Errorf("execute deposit wallet batch: nil request body")
 	}
 
-	return c.submitTransaction(reqBody, option, "execute deposit wallet batch")
+	return c.submitTransaction(ctx, reqBody, option, "execute deposit wallet batch")
 }
 
 func (c *Client) submitTransaction(
+	ctx context.Context,
 	reqBody any,
 	option *sdktypes.AuthOption,
 	action string,
@@ -684,7 +805,7 @@ func (c *Client) submitTransaction(
 
 	var out types.RelayerTransactionResponse
 	resp, err := c.client.DoRequest(
-		context.Background(),
+		ctx,
 		http.MethodPost,
 		types.SUBMIT_TRANSACTION,
 		&http2.RequestOptions{
