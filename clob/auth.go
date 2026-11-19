@@ -59,6 +59,39 @@ func (c *Client) DeriveAPIKey(ctx context.Context, nonce *big.Int, option *sdkty
 	return raw, nil
 }
 
+func (c *Client) CreateBuilderApiKey(ctx context.Context, option *sdktypes.AuthOption) (*sdktypes.BuilderApiKeyCreds, error) {
+	if option == nil {
+		return nil, errors.New("auth option is required")
+	}
+	if option.ApiKeyCreds == nil {
+		return nil, errors.New("api key creds are required")
+	}
+	if option.SingerAddress == "" {
+		return nil, errors.New("signer address is required")
+	}
+
+	requestPath := types.CREATE_BUILDER_API_KEY
+	ts := time.Now().Unix()
+	l2HeaderArgs := types.L2HeaderArgs{
+		Method:      http.MethodPost,
+		RequestPath: requestPath,
+	}
+
+	l2Headers, err := headers.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create l2 headers")
+	}
+
+	var raw sdktypes.BuilderApiKeyCreds
+	resp, err := c.client.DoRequest(ctx, http.MethodPost, requestPath, &http2.RequestOptions{
+		Headers: l2Headers,
+	}, &raw)
+	if _, e := http2.ParseHTTPError(resp, err); e != nil {
+		return nil, e
+	}
+	return &raw, nil
+}
+
 func (c *Client) GetBalanceAllowance(option *sdktypes.AuthOption) (*types.BalanceAllowanceResponse, error) {
 	requestPath := fmt.Sprintf("%s", types.GET_BALANCE_ALLOWANCE)
 
