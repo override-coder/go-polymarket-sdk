@@ -100,3 +100,55 @@ go test -tags polymarket_live -race -count=1 -run '^(TestSignedBuyLimits|TestBud
 ```sh
 POLY_LIVE_ACTION=query POLY_LIVE_MAX_SPEND=1.20 POLY_LIVE_ORDER_ID='填入订单ID' go test -tags polymarket_live -count=1 -v -run '^TestQueryExistingOrderAndFill$' ./integration/live
 ```
+
+## 统一入口与结果记录
+
+从干净 checkout 执行，每次只执行一个 action，不自动遍历钱包或协议，也不自动重试提交。
+脚本不设置资金操作 ACK，仍须由运行者显式设置。每次必须使用新的 JSONL 文件路径，
+父目录须已存在。文件以 0600 权限独占创建，已有文件会在市场查询或交易前拒绝覆盖。
+
+~~~sh
+bash scripts/live-acceptance.sh buy /绝对路径/safe-v1-buy-001.jsonl
+bash scripts/live-acceptance.sh position /绝对路径/safe-v1-position-001.jsonl
+POLY_LIVE_ORDER_ID='买单ID' POLY_LIVE_SIDE=BUY   bash scripts/live-acceptance.sh query /绝对路径/safe-v1-query-buy-001.jsonl
+
+# SHARES 为明确卖出的份数，最多两位小数；MIN_PRICE 为最低成交价。
+POLY_LIVE_MAX_SPEND= POLY_LIVE_SHARES='2.00' POLY_LIVE_MIN_PRICE='0.45'   bash scripts/live-acceptance.sh sell /绝对路径/safe-v1-sell-001.jsonl
+POLY_LIVE_ORDER_ID='卖单ID' POLY_LIVE_SIDE=SELL POLY_LIVE_MAX_SPEND=   bash scripts/live-acceptance.sh query /绝对路径/safe-v1-query-sell-001.jsonl
+
+# 另选已结算且实际持有获胜仓位的市场。
+bash scripts/live-acceptance.sh redeem /绝对路径/safe-v1-redeem-001.jsonl
+~~~
+
+金额仅为配置示例，运行前按实际确认的份额填写 SHARES。卖单为单笔 FOK，检查买盘深度、
+链上可用份额、实际签单份额和最低价格，核对成交份额及链上持仓减少量，不默认卖出全部历史仓位。
+position 和 sell 需要 POLYGON_RPC。position 同时记录链上及 CLOB 余额，两者可能存在缓存时差，
+不强制即时相等。持仓读取对齐 ts-sdk 合约配置：V1 普通 CTF、V1 neg-risk adapter、V2 PositionManager；
+这里只是 SDK 验收，不修改 watcher。
+
+| 钱包 | 协议 | 验收步骤 |
+| --- | --- | --- |
+| safe | v1 | buy → position → query BUY → sell → query SELL；另行 redeem |
+| safe | v2 | 同上 |
+| deposit | v1 | 同上 |
+| deposit | v2 | 同上 |
+
+每步骤保存独立结果文件。切换矩阵行时更换钱包类型、地址、私钥及 API 凭据、协议、市场、outcome。
+测试期间不要让其他程序操作该钱包。卖出后不再持有获胜仓位，就不能在同一份仓位上验收赎回。
+
+JSONL 记录 started/submitting/submitted/confirmed/position 以及最终 passed/failed/skipped，
+包含 SDK Git revision（有工作区修改时标记 dirty）、钱包、协议、市场、金额/价格、订单 ID、
+Relayer ID、交易哈希、基础单位余额。不记录密钥、认证头或签名。
+confirmed 是检查点，必须结合最后的 passed 判断整个 action 是否通过。程序被强制终止可能无最终行，
+不表示没有提交。submitting 后出现错误或崩溃时先核对已有订单/Relayer 记录，不能直接重跑交易。
+
+有订单 ID 可用 query 恢复成交核验，卖单必须设置 SIDE=SELL；query 不重跑卖出前后的持仓差值检查。
+赎回尚无独立自动恢复用例，可按记录的 Relayer ID 使用 GetTransactionContext 和链上回执复查，
+不能盲目再次 redeem。新结果文件只记录新尝试，不提供链上幂等性。
+直接运行 go test 时 RESULT_FILE 可选，未设置则输出 LIVE_RESULT JSON 行。
+离线测试通过不代表四组主网矩阵已经验收通过。
+
+~~~sh
+go test -tags polymarket_live -race -count=1   -run '^(TestSignedSellLimits|TestPositionContractRouting|TestLiveResultRefusesOverwrite)$' ./integration/live
+bash -n scripts/live-acceptance.sh
+~~~

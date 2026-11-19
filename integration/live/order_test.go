@@ -31,6 +31,7 @@ func positive(t *testing.T, s string) decimal.Decimal {
 // One invocation can submit at most one FOK BUY; the query action never signs an order.
 func TestBuyAndVerifyFill(t *testing.T) {
 	enabled(t, "buy")
+	record := beginResult(t)
 	m := selected(t)
 	require.True(t, m.Active && m.AcceptingOrders && !m.Closed)
 	if m.Version == "v2" {
@@ -71,13 +72,18 @@ func TestBuyAndVerifyFill(t *testing.T) {
 	// FOK BUY Size is collateral. Pin the verified tick so normalization cannot raise the limit.
 	amountFloat := amount.InexactFloat64()
 	order := ct.UserOrderV2{TokenId: m.asset, ConditionId: &m.ConditionID, Side: ct.BUY, Price: price.InexactFloat64(), Size: amountFloat, TickSize: &book.TickSize, UserUsdcBalance: maxSpend}
+	record("submitting", liveResult{Asset: m.asset, Side: string(ct.BUY)})
 	resp, err := a.clob.CreateOrderV2(ctx, &order, ct.OrderTypeFOK, false, false, a.auth)
+	if resp != nil {
+		record("submitted", liveResult{Asset: m.asset, Side: string(ct.BUY), OrderID: resp.OrderID})
+	}
 	require.NoError(t, err, "submit outcome may be unknown on a transport error; reconcile before rerunning")
 	require.NotNil(t, resp)
 	t.Logf("market=%s asset=%s order=%s status=%s", m.ID, m.asset, resp.OrderID, resp.Status)
 	require.True(t, resp.Success, "%s", resp.ErrorMsg)
 	require.NotEmpty(t, resp.OrderID)
-	fills := verifyFill(t, ctx, a, m, resp.OrderID)
+	fills := verifyFill(t, ctx, a, m, resp.OrderID, ct.BUY)
+	recordFills(record, m, resp.OrderID, ct.BUY, fills)
 	if maxSpend != nil {
 		verifyBudgetSpend(t, ctx, a, fills, budget)
 	}
@@ -85,18 +91,28 @@ func TestBuyAndVerifyFill(t *testing.T) {
 
 func TestQueryExistingOrderAndFill(t *testing.T) {
 	enabled(t, "query")
+	record := beginResult(t)
 	m := selected(t)
 	a := wallet(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	a.credentials(t, ctx)
-	fills := verifyFill(t, ctx, a, m, env(t, "ORDER_ID"))
+	side := ct.Side(os.Getenv("POLY_LIVE_SIDE"))
+	if side == "" {
+		side = ct.BUY
+	}
+	require.Contains(t, []ct.Side{ct.BUY, ct.SELL}, side)
+	id := env(t, "ORDER_ID")
+	record("querying", liveResult{Asset: m.asset, OrderID: id, Side: string(side)})
+	fills := verifyFill(t, ctx, a, m, id, side)
+	recordFills(record, m, id, side, fills)
 	if value := os.Getenv("POLY_LIVE_MAX_SPEND"); value != "" {
+		require.Equal(t, ct.BUY, side, "MAX_SPEND is only valid for BUY")
 		verifyBudgetSpend(t, ctx, a, fills, positive(t, value))
 	}
 }
 
-func verifyFill(t *testing.T, ctx context.Context, a account, m selection, id string) []ct.Trade {
+func verifyFill(t *testing.T, ctx context.Context, a account, m selection, id string, side ct.Side) []ct.Trade {
 	t.Helper()
 	var last string
 	for ctx.Err() == nil {
@@ -104,7 +120,7 @@ func verifyFill(t *testing.T, ctx context.Context, a account, m selection, id st
 		if err == nil && order != nil && order.ID != "" {
 			require.True(t, strings.EqualFold(id, order.ID))
 			require.True(t, strings.EqualFold(order.MakerAddress, a.auth.FunderAddress), "order belongs to a different funding wallet")
-			require.Equal(t, string(ct.BUY), order.Side)
+			require.Equal(t, string(side), order.Side)
 			require.Equal(t, string(ct.OrderTypeFOK), order.OrderType)
 			require.Equal(t, m.asset, order.AssetID)
 			require.True(t, strings.EqualFold(m.ConditionID, order.Market))

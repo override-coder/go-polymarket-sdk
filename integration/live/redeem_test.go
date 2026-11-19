@@ -58,6 +58,7 @@ func erc1155Balance(t *testing.T, ctx context.Context, rpc *ethclient.Client, co
 
 func TestRedeemResolvedPosition(t *testing.T) {
 	enabled(t, "redeem")
+	record := beginResult(t)
 	m := selected(t)
 	require.True(t, m.Closed, "use a resolved market with an existing winning position")
 	if m.Version == "v2" {
@@ -77,13 +78,7 @@ func TestRedeemResolvedPosition(t *testing.T) {
 	chain, err := rpc.ChainID(ctx)
 	require.NoError(t, err)
 	require.Equal(t, big.NewInt(137), chain)
-	token := common.HexToAddress(ctf)
-	if m.NegRisk && m.Version == "v1" {
-		token = common.HexToAddress("0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296")
-	}
-	if m.Version == "v2" {
-		token = common.HexToAddress(manager)
-	}
+	token := positionContract(m)
 	holder := common.HexToAddress(a.auth.FunderAddress)
 	before := erc1155Balance(t, ctx, rpc, token, holder, m.number, nil)
 	require.Positive(t, before.Sign(), "wallet has no selected winning shares")
@@ -103,11 +98,15 @@ func TestRedeemResolvedPosition(t *testing.T) {
 	}
 	_, err = rpc.CallContract(ctx, ethereum.CallMsg{From: holder, To: &target, Data: data}, nil)
 	require.NoError(t, err, "redeem simulation from the funding wallet")
+	record("submitting", liveResult{Asset: m.asset, Contract: token.Hex(), Balance: before.String()})
 	var tx *rt.RelayerTransactionResponse
 	if a.auth.SignatureType == model.POLY_1271 {
 		tx, err = a.relay.ExecuteDepositWalletBatch([]rt.DepositWalletCall{{Target: target.Hex(), Value: "0", Data: hexutil.Encode(data)}}, strconv.FormatInt(time.Now().Add(5*time.Minute).Unix(), 10), &a.beacon, a.auth)
 	} else {
 		tx, err = a.relay.Execute([]rt.SafeTransaction{{To: target.Hex(), Value: "0", Operation: rt.OperationCall, Data: hexutil.Encode(data)}}, "redeem market "+m.ID, a.auth)
+	}
+	if tx != nil {
+		record("submitted", liveResult{Asset: m.asset, RelayerID: tx.TransactionID})
 	}
 	require.NoError(t, err)
 	require.NotNil(t, tx)
@@ -115,7 +114,7 @@ func TestRedeemResolvedPosition(t *testing.T) {
 	t.Logf("redeem market=%s wallet=%s relayer_id=%s", m.ID, holder, tx.TransactionID)
 	var receipt *ethtypes.Receipt
 	for receipt == nil && ctx.Err() == nil {
-		rows, err := a.relay.GetTransaction(tx.TransactionID)
+		rows, err := a.relay.GetTransactionContext(ctx, tx.TransactionID)
 		if err == nil {
 			for _, row := range rows {
 				if row.TransactionID != tx.TransactionID {
@@ -151,5 +150,6 @@ func TestRedeemResolvedPosition(t *testing.T) {
 		}
 	}
 	require.Positive(t, received.Sign(), "receipt has no pUSD payment to funding wallet")
+	record("confirmed", liveResult{Asset: m.asset, RelayerID: tx.TransactionID, Hashes: []string{receipt.TxHash.Hex()}, Contract: token.Hex(), Balance: after.String()})
 	t.Logf("redeemed tx=%s position_units=%s pUSD_units=%s", receipt.TxHash, before, received)
 }

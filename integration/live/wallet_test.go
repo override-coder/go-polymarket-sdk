@@ -33,7 +33,7 @@ func enabled(t *testing.T, action string) {
 	if os.Getenv("POLY_LIVE_ACTION") != action {
 		t.Skipf("requires POLY_LIVE_ACTION=%s", action)
 	}
-	if action != "query" {
+	if action != "query" && action != "position" {
 		require.Equal(t, "I_UNDERSTAND_THIS_USES_REAL_FUNDS", os.Getenv("POLY_LIVE_ACK"))
 	}
 }
