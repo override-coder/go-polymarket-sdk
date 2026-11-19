@@ -113,6 +113,15 @@ func (c *Client) GetTransactions() ([]types.RelayerTransaction, error) {
 }
 
 func (c *Client) Deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if c.resolveBuilderAPIKeyCreds(option) == nil {
+		return nil, fmt.Errorf("builder API credentials are required")
+	}
+	if option == nil {
+		return nil, fmt.Errorf("auth option is required")
+	}
+	if c.signFn == nil {
+		return nil, fmt.Errorf("signature function is required")
+	}
 	safeAddr, err := c.GetExpectedSafe(option.SingerAddress)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "deploy getExpectedSafe signer:%v", option.SingerAddress)
@@ -191,6 +200,18 @@ func (c *Client) deploy(option *sdktypes.AuthOption) (*types.RelayerTransactionR
 }
 
 func (c *Client) Execute(txns []types.SafeTransaction, metadata string, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if c.resolveBuilderAPIKeyCreds(option) == nil {
+		return nil, fmt.Errorf("builder API credentials are required")
+	}
+	if option == nil {
+		return nil, fmt.Errorf("auth option is required")
+	}
+	if c.signFn == nil {
+		return nil, fmt.Errorf("signature function is required")
+	}
+	if len(txns) == 0 {
+		return nil, fmt.Errorf("transactions are required")
+	}
 	start := time.Now()
 	from := option.SingerAddress
 	safeAddr, err := c.GetExpectedSafe(from)
@@ -326,6 +347,12 @@ func (c *Client) PollUntilState(
 }
 
 func (c *Client) BuildDeployTx(option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	if option == nil {
+		return nil, fmt.Errorf("auth option is required")
+	}
+	if c.signFn == nil {
+		return nil, fmt.Errorf("signature function is required")
+	}
 	safeAddr, err := c.GetExpectedSafe(option.SingerAddress)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "deploy getExpectedSafe signer:%v", option.SingerAddress)
@@ -359,6 +386,18 @@ func (c *Client) BuildDeployTx(option *sdktypes.AuthOption) (*types.TransactionR
 }
 
 func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadata string, option *sdktypes.AuthOption) (*types.TransactionRequest, error) {
+	if option == nil {
+		return nil, fmt.Errorf("auth option is required")
+	}
+	if c.signFn == nil {
+		return nil, fmt.Errorf("signature function is required")
+	}
+	if len(txns) == 0 {
+		return nil, fmt.Errorf("transactions are required")
+	}
+	if nonceAt == nil || nonceAt.Sign() < 0 {
+		return nil, fmt.Errorf("non-negative nonce is required; use zero to fetch the current nonce")
+	}
 	from := option.SingerAddress
 	safeAddr, err := c.GetExpectedSafe(from)
 	if err != nil {
@@ -398,6 +437,15 @@ func (c *Client) BuildTx(txns []types.SafeTransaction, nonceAt *big.Int, metadat
 }
 
 func (c *Client) ExecuteByTx(reqBody *types.TransactionRequest, option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if c.resolveBuilderAPIKeyCreds(option) == nil {
+		return nil, fmt.Errorf("builder API credentials are required")
+	}
+	if option == nil {
+		return nil, fmt.Errorf("auth option is required")
+	}
+	if reqBody == nil {
+		return nil, fmt.Errorf("request body is required")
+	}
 	start := time.Now()
 	from := option.SingerAddress
 	safeAddr, err := c.GetExpectedSafe(from)
@@ -475,6 +523,9 @@ func (c *Client) GetExpectedBeaconDepositWallet(ownerAddr string) (string, error
 }
 
 func (c *Client) DeployDepositWallet(option *sdktypes.AuthOption) (*types.RelayerTransactionResponse, error) {
+	if c.resolveBuilderAPIKeyCreds(option) == nil {
+		return nil, fmt.Errorf("builder API credentials are required")
+	}
 	if option == nil {
 		return nil, fmt.Errorf("deploy deposit wallet: nil auth option")
 	}
@@ -500,8 +551,20 @@ func (c *Client) BuildDepositWalletBatch(
 	option *sdktypes.AuthOption,
 ) (*types.DepositWalletBatchRequest, error) {
 	if option == nil {
-		return nil, fmt.Errorf("build deposit wallet batch: nil auth option")
+		return nil, fmt.Errorf("auth option is required")
 	}
+	if c.signFn == nil {
+		return nil, fmt.Errorf("signature function is required")
+	}
+	if value, ok := new(big.Int).SetString(deadline, 10); !ok || value.Sign() <= 0 || value.BitLen() > 256 {
+		return nil, fmt.Errorf("deadline must be a positive uint256 decimal")
+	}
+	if nonceAt != nil {
+		if value, ok := new(big.Int).SetString(*nonceAt, 10); !ok || value.Sign() < 0 || value.BitLen() > 256 {
+			return nil, fmt.Errorf("nonce must be a uint256 decimal")
+		}
+	}
+
 	from := option.SingerAddress
 	if from == "" {
 		return nil, fmt.Errorf("build deposit wallet batch: empty signer address")
@@ -563,6 +626,9 @@ func (c *Client) ExecuteDepositWalletBatch(
 	useBeaconDepositWallet *bool,
 	option *sdktypes.AuthOption,
 ) (*types.RelayerTransactionResponse, error) {
+	if c.resolveBuilderAPIKeyCreds(option) == nil {
+		return nil, fmt.Errorf("builder API credentials are required")
+	}
 	if option == nil {
 		return nil, fmt.Errorf("execute deposit wallet batch: nil auth option")
 	}
@@ -579,6 +645,9 @@ func (c *Client) ExecuteDepositWalletBatchByTx(
 	reqBody *types.DepositWalletBatchRequest,
 	option *sdktypes.AuthOption,
 ) (*types.RelayerTransactionResponse, error) {
+	if c.resolveBuilderAPIKeyCreds(option) == nil {
+		return nil, fmt.Errorf("builder API credentials are required")
+	}
 	if option == nil {
 		return nil, fmt.Errorf("execute deposit wallet batch: nil auth option")
 	}

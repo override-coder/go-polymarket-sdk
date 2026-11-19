@@ -19,6 +19,16 @@ import (
 )
 
 func (c *Client) CreateOrder(ctx context.Context, userOrder types.UserOrder, orderType types.OrderType, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
+	if err := c.validateOrderSigner(option); err != nil {
+		return nil, err
+	}
+	if err := validateOrderInput(userOrder.TokenID, userOrder.Price, userOrder.Size, userOrder.Side, orderType, userOrder.TickSize); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalAmount("fee rate", userOrder.FeeRateBps); err != nil {
+		return nil, err
+	}
+
 	tokenID := userOrder.TokenID
 
 	tickSize := ""
@@ -32,6 +42,9 @@ func (c *Client) CreateOrder(ctx context.Context, userOrder types.UserOrder, ord
 		tickSize = tickSz
 	}
 
+	if err := validateTick(tickSize); err != nil {
+		return nil, err
+	}
 	feeRateBps := float64(0)
 	if userOrder.FeeRateBps != nil {
 		feeRateBps = *userOrder.FeeRateBps
@@ -68,6 +81,9 @@ func (c *Client) CreateOrder(ctx context.Context, userOrder types.UserOrder, ord
 		negRisk = risk
 	}
 
+	if err := validateOrderAmounts(userOrder.Price, userOrder.Size, userOrder.Side, orderType, tickSize); err != nil {
+		return nil, err
+	}
 	signedOrder, err := c.orderBuilder.buildOrder(userOrder, orderType, types.CreateOrderOptions{
 		AuthOption: option,
 		TickSize:   types.TickSize(tickSize),
@@ -149,6 +165,9 @@ func orderToJson(order *model.SignedOrder, owner string, orderType *types.OrderT
 }
 
 func (c *Client) GetOrder(ctx context.Context, orderId string, req types.GetOrderRequest, option *sdktypes.AuthOption) (*types.OpenOrder, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
 	requestPath := fmt.Sprintf("%s%s", types.GET_ORDER, orderId)
 
 	ts := time.Now().Unix()
@@ -179,6 +198,9 @@ func (c *Client) GetOrder(ctx context.Context, orderId string, req types.GetOrde
 }
 
 func (c *Client) GetOrders(ctx context.Context, req types.GetActiveOrdersRequest, option *sdktypes.AuthOption) (*types.OpenOrders, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
 	if req.AssetID != "" && strings.TrimSpace(req.Market) == "" {
 		return nil, errors.New("asset_id requires market")
 	}
@@ -215,6 +237,9 @@ func (c *Client) GetOrders(ctx context.Context, req types.GetActiveOrdersRequest
 }
 
 func (c *Client) CancelOrder(ctx context.Context, orderId string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
 	if orderId == "" {
 		return nil, errors.New("order id is empty")
 	}
@@ -254,6 +279,9 @@ func (c *Client) CancelOrder(ctx context.Context, orderId string, option *sdktyp
 }
 
 func (c *Client) CancelOrders(ctx context.Context, orderId []string, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
 	if len(orderId) == 0 {
 		return nil, errors.New("orderId is empty")
 	}
@@ -290,6 +318,9 @@ func (c *Client) CancelOrders(ctx context.Context, orderId []string, option *sdk
 }
 
 func (c *Client) CancelOrderAll(ctx context.Context, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
 	requestPath := fmt.Sprintf("%s", types.CANCEL_ALL)
 	ts := time.Now().Unix()
 	l2HeaderArgs := types.L2HeaderArgs{
@@ -313,6 +344,12 @@ func (c *Client) CancelOrderAll(ctx context.Context, option *sdktypes.AuthOption
 }
 
 func (c *Client) CancelOrderByMarket(ctx context.Context, request *types.CancelOrderRequest, option *sdktypes.AuthOption) (*types.CancelOrder, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
+	if request == nil {
+		return nil, errors.New("cancel request is required")
+	}
 	requestPath := fmt.Sprintf("%s", types.CANCEL_MARKET_ORDERS)
 	ts := time.Now().Unix()
 

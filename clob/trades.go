@@ -13,6 +13,9 @@ import (
 )
 
 func (c *Client) GetTrades(ctx context.Context, req clobtypes.GetTradesRequest, option *sdktypes.AuthOption) (*clobtypes.Trades, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
 	ts := time.Now().Unix()
 	l2HeaderArgs := clobtypes.L2HeaderArgs{
 		Method:      http.MethodGet,

@@ -28,6 +28,12 @@ const (
 )
 
 func BuildClobEip712Signature(signatureFunc SignatureFunc, chainId *big.Int, singer, ts string, nonce *big.Int) (sigHex string, err error) {
+	if signatureFunc == nil {
+		return "", fmt.Errorf("signature function is required")
+	}
+	if chainId == nil || chainId.Sign() <= 0 {
+		return "", fmt.Errorf("positive chain ID is required")
+	}
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": []apitypes.Type{
@@ -70,6 +76,12 @@ func BuildClobEip712Signature(signatureFunc SignatureFunc, chainId *big.Int, sin
 }
 
 func BuildSafeCreateTransactionEip712Signature(signatureFunc SignatureFunc, chainId *big.Int, singer, safeCfg, paymentToken, payment, paymentReceiver string) (string, error) {
+	if signatureFunc == nil {
+		return "", fmt.Errorf("signature function is required")
+	}
+	if chainId == nil || chainId.Sign() <= 0 {
+		return "", fmt.Errorf("positive chain ID is required")
+	}
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": []apitypes.Type{
@@ -125,6 +137,9 @@ func BuildSafeCreateSafeSignature(
 	refundReceiver string,
 	nonce string,
 ) ([]byte, error) {
+	if signatureFunc == nil {
+		return nil, fmt.Errorf("signature function is required")
+	}
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": []apitypes.Type{
@@ -186,6 +201,9 @@ func BuildDepositWalletBatchSignature(
 	deadline string,
 	calls []types.DepositWalletCall,
 ) (string, error) {
+	if signatureFunc == nil {
+		return "", fmt.Errorf("signature function is required")
+	}
 	typedCalls := make([]map[string]interface{}, 0, len(calls))
 	for _, call := range calls {
 		typedCalls = append(typedCalls, map[string]interface{}{

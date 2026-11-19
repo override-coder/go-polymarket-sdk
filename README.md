@@ -72,3 +72,22 @@ go test -mod=mod -race ./clob -run '^(TestFetchBalanceAllowance.*|TestMarketBuyB
 价格取整维持现有兼容行为；调用方应按市场步长传价格，并核对最终签单/成交金额。
 watcher 的链上持仓合约选择不属于本次 SDK 修改。仅离线构建和回归不能证明真实赎回已成功，
 实盘验收结果应另行记录订单 ID、交易哈希与回执。
+
+## 公开交易入口的参数边界
+
+CLOB 认证、查询和撤单入口拒绝 nil AuthOption；L2 操作拒绝缺失 API 凭据。
+已有 API 凭据的查询/撤单不要求签名函数。CreateOrder/CreateOrderV2 在访问市场前检查签名函数、
+正 chain ID、uint256 资产 ID、BUY/SELL、订单类型、有限正数量及 0 < price < 1。
+V2 额外拒绝 nil 订单、非有限或负余额/Builder 费率，以及 FOK/FAK + postOnly。
+
+tick 字符串支持 0.1、0.01、0.005、0.0025、0.001、0.0001；其他值报错，不再套用默认精度。
+这是非法输入行为的收紧。有效输入保留现有价格归一化和取整，未整体改为 ts-sdk 严格步长拒绝策略。
+
+Safe 构建/签名入口拒绝 nil AuthOption、缺失签名函数、空交易列表及 nil/负 nonce；
+BuildTx 仍用 nonce=0 查询当前 nonce。Deposit batch 拒绝非法 uint256 nonce/deadline；
+提交入口提前检查 Builder 凭据是否存在。已签名的 ByTx 提交不要求签名函数。
+签名工具函数也返回缺失签名函数或 chain ID 的错误。
+
+校验不验证凭据是否撤销、订单是否可成交或余额是否足够，也不替代服务端校验。
+构造函数签名未改变，Relayer 构造仍要求受支持的 Polygon chain ID 137。
+统一实盘验收入口及 Safe/Deposit × V1/V2 矩阵见 [验收说明](integration/live/README.md)。

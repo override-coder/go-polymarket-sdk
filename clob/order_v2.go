@@ -24,6 +24,25 @@ import (
 var v2PositionReservedBits = new(big.Int).Lsh(new(big.Int).SetUint64(math.MaxUint64), 40)
 
 func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2, orderType types.OrderType, postOnly, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
+	if userOrder == nil {
+		return nil, fmt.Errorf("order is required")
+	}
+	if err := c.validateOrderSigner(option); err != nil {
+		return nil, err
+	}
+	if err := validateOrderInput(userOrder.TokenId, userOrder.Price, userOrder.Size, userOrder.Side, orderType, userOrder.TickSize); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalAmount("balance", userOrder.UserUsdcBalance); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalAmount("builder fee rate", userOrder.BuilderFeeRate); err != nil {
+		return nil, err
+	}
+	if postOnly && (orderType == types.OrderTypeFOK || orderType == types.OrderTypeFAK) {
+		return nil, fmt.Errorf("postOnly requires GTC or GTD")
+	}
+
 	tokenID := userOrder.TokenId
 
 	market, err := c.orderMarketInfo(ctx, tokenID, userOrder.ConditionId)
@@ -36,6 +55,9 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 		tickSize = *userOrder.TickSize
 	}
 
+	if err := validateTick(tickSize); err != nil {
+		return nil, err
+	}
 	tickSizeFloat64 := utils.StringToDecimal(tickSize).InexactFloat64()
 	normalizedPrice := utils.NormalizePrice(userOrder.Price, tickSizeFloat64)
 	if normalizedPrice != userOrder.Price {
@@ -70,6 +92,12 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 
 	userOrder.Price = normalizedPrice
 	c.adjustBuyMarketOrderAmountForFees(userOrder, market.FeeDetails, orderType)
+	if !finite(userOrder.Size) || userOrder.Size <= 0 {
+		return nil, fmt.Errorf("adjusted order size must be finite and positive")
+	}
+	if err := validateOrderAmounts(userOrder.Price, userOrder.Size, userOrder.Side, orderType, tickSize); err != nil {
+		return nil, err
+	}
 	// The order-utils builder accepts decimal uint256s. CLOB uses the supplied asset ID.
 	signingOrder := *userOrder
 	signingOrder.TokenId = assetID.String()

@@ -15,6 +15,9 @@ import (
 )
 
 func (c *Client) EnsureAPIKey(ctx context.Context, nonce *big.Int, option *sdktypes.AuthOption) (*sdktypes.ApiKeyCreds, error) {
+	if err := validateAuthOption(option, false); err != nil {
+		return nil, err
+	}
 	if creds, err := c.DeriveAPIKey(ctx, nonce, option); err == nil {
 		option.ApiKeyCreds = creds
 		return creds, nil
@@ -28,6 +31,9 @@ func (c *Client) EnsureAPIKey(ctx context.Context, nonce *big.Int, option *sdkty
 }
 
 func (c *Client) CreateApiKey(ctx context.Context, nonce *big.Int, option *sdktypes.AuthOption) (*sdktypes.ApiKeyCreds, error) {
+	if err := validateAuthOption(option, false); err != nil {
+		return nil, err
+	}
 	ts := time.Now().Unix()
 	l1Headers, err := headers.CreateL1Headers(option.SingerAddress, c.signFn, c.chainId, nonce, &ts)
 	if err != nil {
@@ -44,6 +50,9 @@ func (c *Client) CreateApiKey(ctx context.Context, nonce *big.Int, option *sdkty
 }
 
 func (c *Client) DeriveAPIKey(ctx context.Context, nonce *big.Int, option *sdktypes.AuthOption) (*sdktypes.ApiKeyCreds, error) {
+	if err := validateAuthOption(option, false); err != nil {
+		return nil, err
+	}
 	ts := time.Now().Unix()
 	l1Headers, err := headers.CreateL1Headers(option.SingerAddress, c.signFn, c.chainId, nonce, &ts)
 	if err != nil {
@@ -137,6 +146,9 @@ func (c *Client) FetchBalanceAllowance(ctx context.Context, request types.Balanc
 }
 
 func (c *Client) UpdateBalanceAllowance(params map[string]any, option *sdktypes.AuthOption) (map[string]interface{}, error) {
+	if err := validateAuthOption(option, true); err != nil {
+		return nil, err
+	}
 
 	requestPath := fmt.Sprintf("%s", types.UPDATE_BALANCE_ALLOWANCE)
 
