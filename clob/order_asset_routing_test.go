@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/override-coder/go-polymarket-sdk/clob/types"
@@ -129,6 +130,7 @@ func TestCreateOrderV2RequiresExactMarketAsset(t *testing.T) {
 		warm                    bool
 	}{
 		{"different spelling", asset, "10", false},
+		{"empty market", asset, "", false},
 		{"different cached market", asset, "10", true},
 		{"surrounding whitespace", " 0x0a ", asset, false},
 		{"surrounding whitespace with cached market", " 0x0a ", asset, true},
@@ -143,12 +145,20 @@ func TestCreateOrderV2RequiresExactMarketAsset(t *testing.T) {
 					if !allowCorrectMarket.Load() && r.URL.Path != "/markets-by-token/"+tt.requested {
 						t.Errorf("asset lookup path = %q, want exact asset %q", r.URL.Path, tt.requested)
 					}
-					_, _ = fmt.Fprint(w, `{"condition_id":"market"}`)
-				case "GET /clob-markets/market":
+					condition := "market"
+					if allowCorrectMarket.Load() {
+						condition = "corrected"
+					}
+					_, _ = fmt.Fprintf(w, `{"condition_id":%q}`, condition)
+				case "GET /clob-markets/market", "GET /clob-markets/corrected":
 					marketReads.Add(1)
 					id := tt.listed
-					if allowCorrectMarket.Load() {
+					if r.URL.Path == "/clob-markets/corrected" || (tt.warm && allowCorrectMarket.Load()) {
 						id = asset
+					}
+					if id == "" {
+						_, _ = fmt.Fprint(w, `{"mts":0.01,"t":[]}`)
+						return
 					}
 					_, _ = fmt.Fprintf(w, `{"mts":0.01,"fd":{"r":0.1,"e":1},"t":[{"t":%q,"o":"yes"}]}`, id)
 				case "POST /order":
@@ -194,4 +204,59 @@ func TestCreateOrderV2RequiresExactMarketAsset(t *testing.T) {
 			require.Equal(t, int32(1), posts.Load())
 		})
 	}
+}
+
+func TestOrderMarketInfoSharesResolvedConditionDuringMarketFetch(t *testing.T) {
+	const asset = "0x0a"
+	var resolutions, markets atomic.Int32
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/markets-by-token/" + asset:
+			resolutions.Add(1)
+			_, _ = fmt.Fprint(w, `{"condition_id":"market"}`)
+		case "/clob-markets/market":
+			markets.Add(1)
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			select {
+			case <-release:
+				_, _ = fmt.Fprint(w, `{"t":[{"t":"0x0a"}]}`)
+			case <-r.Context().Done():
+			}
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client := NewClient(server.URL, big.NewInt(137), nil, nil)
+	results := make(chan error, 2)
+	fetch := func() {
+		_, err := client.orderMarketInfo(ctx, asset, nil)
+		results <- err
+	}
+	go fetch()
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("market request did not start")
+	}
+
+	condition, cached := client.getCachedConditionID(asset)
+	go fetch()
+	close(release)
+	for range 2 {
+		require.NoError(t, <-results)
+	}
+	require.True(t, cached, "condition should be available while market details are in flight")
+	require.Equal(t, "market", condition)
+	require.Equal(t, int32(1), resolutions.Load())
+	require.Equal(t, int32(1), markets.Load())
 }

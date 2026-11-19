@@ -304,7 +304,7 @@ func (c *Client) orderMarketInfo(ctx context.Context, tokenID string, conditionI
 					return "", fmt.Errorf("failed to resolve condition id for token %s", tokenID)
 				}
 
-				return result.ConditionID, nil
+				return c.cacheResolvedConditionID(tokenID, result.ConditionID), nil
 			})
 			if err != nil {
 				return nil, err
@@ -323,8 +323,13 @@ func (c *Client) orderMarketInfo(ctx context.Context, tokenID string, conditionI
 	}
 
 	c.cacheMu.Lock()
-	if c.marketInfos[conditionID] == info {
+	current := c.marketInfos[conditionID]
+	if current == info {
 		c.deleteConditionCacheLocked(conditionID)
+	}
+	// A lookup may have cached this asset even though the market does not list it.
+	if c.tokenConditionMap[tokenID] == conditionID && (current == nil || !marketContainsAsset(current, tokenID)) {
+		c.deleteTokenCacheLocked(tokenID)
 	}
 	c.cacheMu.Unlock()
 	return nil, fmt.Errorf("market %s does not include asset %s", conditionID, tokenID)
@@ -344,8 +349,8 @@ func (c *Client) getClobMarketInfo(ctx context.Context, conditionID string) (*ty
 	if err != nil {
 		return nil, errors.Wrapf(err, "get clob market info")
 	}
-	if len(marketInfo.Tokens) == 0 {
-		return nil, errors.Errorf("no token found for condition %s", conditionID)
+	if marketInfo.Tokens == nil {
+		return nil, errors.Errorf("missing token list for condition %s", conditionID)
 	}
 	c.storeMarketInfo(conditionID, marketInfo)
 	return marketInfo, nil
@@ -431,6 +436,22 @@ func (c *Client) cachedMarketInfo(conditionID string) *types.CLOBMarketInfo {
 	}
 	c.touchConditionLocked(conditionID, time.Now())
 	return c.marketInfos[conditionID]
+}
+
+// Cache the lookup before fetching market details so concurrent orders can share it.
+func (c *Client) cacheResolvedConditionID(tokenID, conditionID string) string {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+
+	if cached := c.tokenConditionMap[tokenID]; cached != "" && c.isFreshLocked(c.tokenConditionCachedAt[tokenID]) {
+		// A concurrent market fetch populated this mapping while the lookup was in flight.
+		return cached
+	}
+	now := time.Now()
+	c.tokenConditionMap[tokenID] = conditionID
+	c.tokenConditionCachedAt[tokenID] = now
+	c.tokenConditionLastUsedAt[tokenID] = now
+	return conditionID
 }
 
 func (c *Client) getCachedConditionID(tokenID string) (string, bool) {
