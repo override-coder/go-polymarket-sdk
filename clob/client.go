@@ -200,8 +200,11 @@ func (c *Client) GetCLOBMarketInfo(ctx context.Context, conditionID string) (*ty
 }
 
 func (c *Client) GetMarketByToken(ctx context.Context, tokenID string) (*types.MarketByTokenResponse, error) {
-	tokenID = strings.TrimSpace(tokenID)
-	if tokenID == "" {
+	return c.getMarketByAssetID(ctx, strings.TrimSpace(tokenID))
+}
+
+func (c *Client) getMarketByAssetID(ctx context.Context, tokenID string) (*types.MarketByTokenResponse, error) {
+	if strings.TrimSpace(tokenID) == "" {
 		return nil, fmt.Errorf("tokenID is required")
 	}
 
@@ -293,7 +296,7 @@ func (c *Client) orderMarketInfo(ctx context.Context, tokenID string, conditionI
 					return cachedConditionIDSF, nil
 				}
 
-				result, err := c.GetMarketByToken(ctx, tokenID)
+				result, err := c.getMarketByAssetID(ctx, tokenID)
 				if err != nil {
 					return "", err
 				}

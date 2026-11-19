@@ -114,7 +114,7 @@ func TestParseOrderAssetID(t *testing.T) {
 		_, err := parseOrderAssetID(value)
 		require.Error(t, err, value)
 	}
-	for _, value := range []string{"00010", "0xA", "0b1010", "0o12"} {
+	for _, value := range []string{"00010", "0xA", " 0xA ", "0b1010", "0o12"} {
 		id, err := parseOrderAssetID(value)
 		require.NoError(t, err)
 		require.Equal(t, int64(10), id.Int64())
@@ -124,18 +124,29 @@ func TestParseOrderAssetID(t *testing.T) {
 // A different spelling of the same uint256 is a distinct asset key in CLOB market metadata.
 func TestCreateOrderV2RequiresExactMarketAsset(t *testing.T) {
 	const asset = "0x0a"
-	for _, warm := range []bool{false, true} {
-		t.Run(fmt.Sprintf("cached=%t", warm), func(t *testing.T) {
+	for _, tt := range []struct {
+		name, requested, listed string
+		warm                    bool
+	}{
+		{"different spelling", asset, "10", false},
+		{"different cached market", asset, "10", true},
+		{"surrounding whitespace", " 0x0a ", asset, false},
+		{"surrounding whitespace with cached market", " 0x0a ", asset, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
 			var allowCorrectMarket atomic.Bool
 			var marketReads, posts atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				switch r.Method + " " + r.URL.Path {
-				case "GET /markets-by-token/" + asset:
+				case "GET /markets-by-token/" + tt.requested, "GET /markets-by-token/" + asset:
+					if !allowCorrectMarket.Load() && r.URL.Path != "/markets-by-token/"+tt.requested {
+						t.Errorf("asset lookup path = %q, want exact asset %q", r.URL.Path, tt.requested)
+					}
 					_, _ = fmt.Fprint(w, `{"condition_id":"market"}`)
 				case "GET /clob-markets/market":
 					marketReads.Add(1)
-					id := "10"
+					id := tt.listed
 					if allowCorrectMarket.Load() {
 						id = asset
 					}
@@ -158,22 +169,23 @@ func TestCreateOrderV2RequiresExactMarketAsset(t *testing.T) {
 			auth := &sdktypes.AuthOption{SingerAddress: "0x0000000000000000000000000000000000000001", ApiKeyCreds: &sdktypes.ApiKeyCreds{ApiKey: "key", Secret: "c2VjcmV0"}}
 			tick := "0.01"
 			balance := 10.0
-			order := types.UserOrderV2{TokenId: asset, Side: types.BUY, Size: 10, Price: 0.5, TickSize: &tick, UserUsdcBalance: &balance}
-			if warm {
+			order := types.UserOrderV2{TokenId: tt.requested, Side: types.BUY, Size: 10, Price: 0.5, TickSize: &tick, UserUsdcBalance: &balance}
+			if tt.warm {
 				// Both the requested asset and the caller-supplied market have fresh, unrelated entries.
-				client.storeMarketInfo("other", &types.CLOBMarketInfo{Tokens: []types.CLOBMarketInfoToken{{TokenID: asset}}})
-				client.storeMarketInfo("market", &types.CLOBMarketInfo{Tokens: []types.CLOBMarketInfoToken{{TokenID: "10"}}})
+				client.storeMarketInfo("other", &types.CLOBMarketInfo{Tokens: []types.CLOBMarketInfoToken{{TokenID: tt.requested}}})
+				client.storeMarketInfo("market", &types.CLOBMarketInfo{Tokens: []types.CLOBMarketInfoToken{{TokenID: tt.listed}}})
 				condition := "market"
 				order.ConditionId = &condition
 			}
 			ctx := context.Background()
 			_, err := client.CreateOrderV2(ctx, &order, types.OrderTypeFAK, false, true, auth)
-			require.ErrorContains(t, err, "market market does not include asset 0x0a")
+			require.ErrorContains(t, err, "market market does not include asset "+tt.requested)
 			require.Zero(t, signatures)
 			require.Zero(t, posts.Load())
 			require.Equal(t, 10.0, order.Size)
 			previousReads := marketReads.Load()
 			allowCorrectMarket.Store(true)
+			order.TokenId = asset
 			_, err = client.CreateOrderV2(ctx, &order, types.OrderTypeFAK, false, true, auth)
 			require.NoError(t, err)
 			require.Equal(t, previousReads+1, marketReads.Load())

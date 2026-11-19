@@ -24,7 +24,7 @@ import (
 var v2PositionReservedBits = new(big.Int).Lsh(new(big.Int).SetUint64(math.MaxUint64), 40)
 
 func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2, orderType types.OrderType, postOnly, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
-	tokenID := strings.TrimSpace(userOrder.TokenId)
+	tokenID := userOrder.TokenId
 
 	market, err := c.orderMarketInfo(ctx, tokenID, userOrder.ConditionId)
 	if err != nil {
@@ -86,6 +86,7 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 }
 
 func parseOrderAssetID(value string) (*big.Int, error) {
+	value = strings.TrimSpace(value)
 	// Keep unprefixed IDs decimal, including those with leading zeros.
 	base := 10
 	if len(value) >= 2 && value[0] == '0' && strings.ContainsAny(value[1:2], "xXbBoO") {
