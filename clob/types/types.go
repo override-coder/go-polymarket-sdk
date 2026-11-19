@@ -350,6 +350,8 @@ type GetTradesRequest struct {
 }
 
 type Trade struct {
+	ErrMsg          *string          `json:"err_msg"`
+	MatchTimeNano   *string          `json:"match_time_nano"`
 	ID              string           `json:"id"`
 	TakerOrderID    string           `json:"taker_order_id"`
 	Market          string           `json:"market"`
