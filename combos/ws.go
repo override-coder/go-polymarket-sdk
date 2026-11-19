@@ -25,8 +25,9 @@ type WSClient struct {
 	url    string
 	dialer *websocket.Dialer
 
-	conn *websocket.Conn
-	mu   sync.Mutex
+	conn    *websocket.Conn
+	mu      sync.Mutex
+	writeMu sync.Mutex
 }
 
 func NewWSClient(host string) *WSClient {
@@ -64,10 +65,6 @@ func (c *WSClient) Connect(ctx context.Context, option *sdktypes.AuthOption) err
 		return err
 	}
 
-	c.mu.Lock()
-	c.conn = conn
-	c.mu.Unlock()
-
 	maker := option.SingerAddress
 	if option.FunderAddress != "" {
 		maker = option.FunderAddress
@@ -76,7 +73,11 @@ func (c *WSClient) Connect(ctx context.Context, option *sdktypes.AuthOption) err
 	if option.SignatureType == model.POLY_1271 {
 		signer = maker
 	}
-	return c.writeJSON(combostypes.AuthMessage{
+	// Authenticate this connection before publishing it. Cancellation during the
+	// write closes only this socket, never a later replacement.
+	closed := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close(); close(closed) })
+	err = conn.WriteJSON(combostypes.AuthMessage{
 		Type: combostypes.MessageTypeAuth,
 		Auth: combostypes.AuthPayload{
 			APIKey:     option.ApiKeyCreds.ApiKey,
@@ -89,19 +90,50 @@ func (c *WSClient) Connect(ctx context.Context, option *sdktypes.AuthOption) err
 			SignatureType: option.SignatureType,
 		},
 	})
+	if !stop() {
+		<-closed
+	}
+	if ctx.Err() != nil {
+		_ = conn.Close()
+		return ctx.Err()
+	}
+	if err != nil {
+		_ = conn.Close()
+		return err
+	}
+	c.mu.Lock()
+	old := c.conn
+	c.conn = conn
+	c.mu.Unlock()
+	if old != nil {
+		_ = old.Close()
+	}
+	return nil
 }
 
 func (c *WSClient) Close() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.conn == nil {
+	conn := c.conn
+	c.conn = nil
+	c.mu.Unlock()
+	if conn == nil {
 		return nil
 	}
-	err := c.conn.Close()
-	c.conn = nil
-	return err
+	return conn.Close()
 }
 
+// Closing a stale reader must not clear a connection installed by Connect.
+func (c *WSClient) closeConnection(conn *websocket.Conn) {
+	_ = conn.Close() // Closing a socket also unblocks its current reader/writer.
+	c.mu.Lock()
+	if c.conn == conn {
+		c.conn = nil
+	}
+	c.mu.Unlock()
+}
+
+// Read permits one reader at a time, like the underlying Gorilla connection.
+// Cancellation closes the captured connection and joins its reader before returning.
 func (c *WSClient) Read(ctx context.Context) (*Event, error) {
 	c.mu.Lock()
 	conn := c.conn
@@ -120,21 +152,19 @@ func (c *WSClient) Read(ctx context.Context) (*Event, error) {
 		mt, data, err := conn.ReadMessage()
 		ch <- result{messageType: mt, data: data, err: err}
 	}()
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = c.Close()
-		case <-done:
-		}
-	}()
 
 	select {
 	case <-ctx.Done():
+		c.closeConnection(conn)
+		<-ch // Join the reader before allowing another Read on this client.
 		return nil, ctx.Err()
 	case res := <-ch:
+		if ctx.Err() != nil {
+			c.closeConnection(conn)
+			return nil, ctx.Err()
+		}
 		if res.err != nil {
+			c.closeConnection(conn)
 			return nil, res.err
 		}
 		if res.messageType != websocket.TextMessage && res.messageType != websocket.BinaryMessage {
@@ -182,12 +212,15 @@ func (c *WSClient) DeclineQuote(req combostypes.ConfirmationRequest) error {
 }
 
 func (c *WSClient) writeJSON(v any) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.conn == nil {
+	conn := c.conn
+	c.mu.Unlock()
+	if conn == nil {
 		return fmt.Errorf("websocket is not connected")
 	}
-	return c.conn.WriteJSON(v)
+	return conn.WriteJSON(v)
 }
 
 type Event struct {
