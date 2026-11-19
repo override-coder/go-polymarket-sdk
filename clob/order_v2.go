@@ -26,20 +26,14 @@ var v2PositionReservedBits = new(big.Int).Lsh(new(big.Int).SetUint64(math.MaxUin
 func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2, orderType types.OrderType, postOnly, deferExec bool, option *sdktypes.AuthOption) (*types.OrderResponse, error) {
 	tokenID := strings.TrimSpace(userOrder.TokenId)
 
-	err := c.ensureMarketInfoCached(ctx, tokenID, userOrder.ConditionId)
+	market, err := c.orderMarketInfo(ctx, tokenID, userOrder.ConditionId)
 	if err != nil {
 		return nil, err
 	}
 
-	tickSize := ""
+	tickSize := utils.Float64ToDecimal(market.MinimumTickSize).String()
 	if userOrder.TickSize != nil {
 		tickSize = *userOrder.TickSize
-	} else {
-		tickSz, err := c.GetTickSize(ctx, tokenID)
-		if err != nil {
-			return nil, errors.WithMessage(err, "create order get tickSize")
-		}
-		tickSize = tickSz
 	}
 
 	tickSizeFloat64 := utils.StringToDecimal(tickSize).InexactFloat64()
@@ -64,22 +58,18 @@ func (c *Client) CreateOrderV2(ctx context.Context, userOrder *types.UserOrderV2
 	}
 	contract := model.ExchangeV3
 	if new(big.Int).And(assetID, v2PositionReservedBits).Sign() != 0 {
-		negRisk := userOrder.NegRisk
-		if negRisk == nil {
-			risk, err := c.GetNegRisk(ctx, tokenID)
-			if err != nil {
-				return nil, errors.WithMessage(err, "create order get negRisk")
-			}
-			negRisk = &risk
+		negRisk := market.NegRisk
+		if userOrder.NegRisk != nil {
+			negRisk = userOrder.NegRisk
 		}
 		contract = model.CTFExchange
-		if *negRisk {
+		if negRisk != nil && *negRisk {
 			contract = model.NegRiskCTFExchange
 		}
 	}
 
 	userOrder.Price = normalizedPrice
-	c.adjustBuyMarketOrderAmountForFees(userOrder, tokenID, orderType)
+	c.adjustBuyMarketOrderAmountForFees(userOrder, market.FeeDetails, orderType)
 	// The order-utils builder accepts decimal uint256s. CLOB uses the supplied asset ID.
 	signingOrder := *userOrder
 	signingOrder.TokenId = assetID.String()
@@ -185,7 +175,7 @@ func orderToJson2(order *model.SignedOrderV2, tokenID, owner string, orderType *
 	}
 }
 
-func (c *Client) adjustBuyMarketOrderAmountForFees(order *types.UserOrderV2, tokenID string, orderType types.OrderType) {
+func (c *Client) adjustBuyMarketOrderAmountForFees(order *types.UserOrderV2, fees *types.CLOBMarketInfoFeeDetails, orderType types.OrderType) {
 	if order == nil {
 		return
 	}
@@ -210,14 +200,16 @@ func (c *Client) adjustBuyMarketOrderAmountForFees(order *types.UserOrderV2, tok
 		builderTakerFeeRate = *order.BuilderFeeRate
 	}
 
-	feeInfo := c.getCachedFeeInfo(tokenID)
+	if fees == nil {
+		fees = &types.CLOBMarketInfoFeeDetails{}
+	}
 
 	order.Size = adjustBuyAmountForFees(
 		order.Size,
 		price,
 		userUSDCBalance,
-		feeInfo.Rate,
-		feeInfo.Exponent,
+		fees.Rate,
+		fees.Exponent,
 		builderTakerFeeRate,
 	)
 	return

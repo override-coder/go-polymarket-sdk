@@ -39,7 +39,7 @@ type Client struct {
 	feeRates  types.FeeRates
 
 	// v2
-	feeInfos          types.FeeInfos
+	marketInfos       map[string]*types.CLOBMarketInfo
 	tokenConditionMap map[string]string
 
 	cacheMu                   sync.RWMutex
@@ -49,7 +49,6 @@ type Client struct {
 	marketInfoLastUsedAt      map[string]time.Time
 	tokenConditionCachedAt    map[string]time.Time
 	tokenConditionLastUsedAt  map[string]time.Time
-	conditionTokenMap         map[string][]string
 	marketInfoSingleflight    singleflight.Group
 	marketByTokenSingleflight singleflight.Group
 	resolveTradesTimeout      time.Duration
@@ -69,7 +68,7 @@ func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, buil
 		tickSizes:                 make(types.TickSizes, 500),
 		negRisk:                   make(types.NegRisks, 500),
 		feeRates:                  make(types.FeeRates, 500),
-		feeInfos:                  make(types.FeeInfos, 500),
+		marketInfos:               make(map[string]*types.CLOBMarketInfo, 500),
 		tokenConditionMap:         make(map[string]string, 500),
 		marketInfoCacheTTL:        defaultMarketInfoCacheTTL,
 		marketInfoCacheIdleTTL:    defaultMarketInfoCacheIdleTTL,
@@ -77,7 +76,6 @@ func NewClient(host string, chainId *big.Int, signFn signing.SignatureFunc, buil
 		marketInfoLastUsedAt:      make(map[string]time.Time, 500),
 		tokenConditionCachedAt:    make(map[string]time.Time, 500),
 		tokenConditionLastUsedAt:  make(map[string]time.Time, 500),
-		conditionTokenMap:         make(map[string][]string, 500),
 		resolveTradesTimeout:      defaultResolveTradesTimeout,
 		resolveTradesPollInterval: defaultResolveTradesPollInterval,
 	}
@@ -281,11 +279,7 @@ func (c *Client) GetLastTradePrices(ctx context.Context, prices []types.LastTrad
 	return resp, nil
 }
 
-func (c *Client) ensureMarketInfoCached(ctx context.Context, tokenID string, conditionId *string) error {
-	if c.hasFreshMarketInfoForToken(tokenID, conditionId) {
-		return nil
-	}
-
+func (c *Client) orderMarketInfo(ctx context.Context, tokenID string, conditionId *string) (*types.CLOBMarketInfo, error) {
 	conditionID := ""
 	if conditionId != nil {
 		conditionID = *conditionId
@@ -307,23 +301,39 @@ func (c *Client) ensureMarketInfoCached(ctx context.Context, tokenID string, con
 					return "", fmt.Errorf("failed to resolve condition id for token %s", tokenID)
 				}
 
-				c.storeTokenConditionMap(result.ConditionID, tokenID, result.PrimaryTokenID, result.SecondaryTokenID)
 				return result.ConditionID, nil
 			})
 			if err != nil {
-				return err
+				return nil, err
 			}
 			cachedConditionID = value.(string)
 		}
 		conditionID = cachedConditionID
 	}
 
-	_, err := c.getClobMarketInfoCached(ctx, conditionID)
+	info, err := c.getClobMarketInfoCached(ctx, conditionID)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if marketContainsAsset(info, tokenID) {
+		return info, nil
 	}
 
-	return nil
+	c.cacheMu.Lock()
+	if c.marketInfos[conditionID] == info {
+		c.deleteConditionCacheLocked(conditionID)
+	}
+	c.cacheMu.Unlock()
+	return nil, fmt.Errorf("market %s does not include asset %s", conditionID, tokenID)
+}
+
+func marketContainsAsset(info *types.CLOBMarketInfo, assetID string) bool {
+	for _, token := range info.Tokens {
+		if token.TokenID == assetID {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) getClobMarketInfo(ctx context.Context, conditionID string) (*types.CLOBMarketInfo, error) {
@@ -339,21 +349,18 @@ func (c *Client) getClobMarketInfo(ctx context.Context, conditionID string) (*ty
 }
 
 func (c *Client) getClobMarketInfoCached(ctx context.Context, conditionID string) (*types.CLOBMarketInfo, error) {
-	if c.hasFreshMarketInfoForCondition(conditionID) {
-		return nil, nil
+	if info := c.cachedMarketInfo(conditionID); info != nil {
+		return info, nil
 	}
 
 	value, err, _ := c.marketInfoSingleflight.Do(conditionID, func() (any, error) {
-		if c.hasFreshMarketInfoForCondition(conditionID) {
-			return nil, nil
+		if info := c.cachedMarketInfo(conditionID); info != nil {
+			return info, nil
 		}
 		return c.getClobMarketInfo(ctx, conditionID)
 	})
 	if err != nil {
 		return nil, err
-	}
-	if value == nil {
-		return nil, nil
 	}
 	return value.(*types.CLOBMarketInfo), nil
 }
@@ -371,8 +378,8 @@ func (c *Client) storeMarketInfo(conditionID string, marketInfo *types.CLOBMarke
 	if c.negRisk == nil {
 		c.negRisk = make(types.NegRisks)
 	}
-	if c.feeInfos == nil {
-		c.feeInfos = make(types.FeeInfos)
+	if c.marketInfos == nil {
+		c.marketInfos = make(map[string]*types.CLOBMarketInfo)
 	}
 	if c.marketInfoCachedAt == nil {
 		c.marketInfoCachedAt = make(map[string]time.Time)
@@ -386,20 +393,23 @@ func (c *Client) storeMarketInfo(conditionID string, marketInfo *types.CLOBMarke
 	if c.tokenConditionLastUsedAt == nil {
 		c.tokenConditionLastUsedAt = make(map[string]time.Time)
 	}
-	if c.conditionTokenMap == nil {
-		c.conditionTokenMap = make(map[string][]string)
-	}
 
+	if previous := c.marketInfos[conditionID]; previous != nil {
+		for _, token := range previous.Tokens {
+			if c.tokenConditionMap[token.TokenID] == conditionID && !marketContainsAsset(marketInfo, token.TokenID) {
+				c.deleteTokenCacheLocked(token.TokenID)
+			}
+		}
+	}
 	now := time.Now()
 	c.marketInfoCachedAt[conditionID] = now
 	c.marketInfoLastUsedAt[conditionID] = now
-	c.conditionTokenMap[conditionID] = c.conditionTokenMap[conditionID][:0]
+	c.marketInfos[conditionID] = marketInfo
 	for _, token := range marketInfo.Tokens {
 		tokenID := token.TokenID
 		c.tokenConditionMap[tokenID] = conditionID
 		c.tokenConditionCachedAt[tokenID] = now
 		c.tokenConditionLastUsedAt[tokenID] = now
-		c.conditionTokenMap[conditionID] = append(c.conditionTokenMap[conditionID], tokenID)
 		c.tickSizes[tokenID] = types.TickSize(utils.Float64ToDecimal(marketInfo.MinimumTickSize).String())
 
 		negRisk := false
@@ -407,80 +417,17 @@ func (c *Client) storeMarketInfo(conditionID string, marketInfo *types.CLOBMarke
 			negRisk = *marketInfo.NegRisk
 		}
 		c.negRisk[tokenID] = negRisk
-
-		rate := 0.0
-		exponent := 0.0
-		if marketInfo.FeeDetails != nil {
-			rate = marketInfo.FeeDetails.Rate
-			exponent = marketInfo.FeeDetails.Exponent
-		}
-
-		c.feeInfos[tokenID] = types.FeeInfo{
-			Rate:     rate,
-			Exponent: exponent,
-		}
 	}
 }
 
-func (c *Client) storeTokenConditionMap(conditionID string, tokenIDs ...string) {
+func (c *Client) cachedMarketInfo(conditionID string) *types.CLOBMarketInfo {
 	c.cacheMu.Lock()
 	defer c.cacheMu.Unlock()
-
-	if c.tokenConditionMap == nil {
-		c.tokenConditionMap = make(map[string]string)
-	}
-	if c.tokenConditionCachedAt == nil {
-		c.tokenConditionCachedAt = make(map[string]time.Time)
-	}
-	if c.tokenConditionLastUsedAt == nil {
-		c.tokenConditionLastUsedAt = make(map[string]time.Time)
-	}
-
-	now := time.Now()
-	for _, tokenID := range tokenIDs {
-		if tokenID == "" {
-			continue
-		}
-		c.tokenConditionMap[tokenID] = conditionID
-		c.tokenConditionCachedAt[tokenID] = now
-		c.tokenConditionLastUsedAt[tokenID] = now
-	}
-}
-
-func (c *Client) hasFreshMarketInfoForToken(tokenID string, conditionId *string) bool {
-	c.cacheMu.Lock()
-	defer c.cacheMu.Unlock()
-
-	if _, ok := c.feeInfos[tokenID]; !ok {
-		return false
-	}
-
-	conditionID := ""
-	if conditionId != nil {
-		conditionID = *conditionId
-	}
-	if conditionID == "" {
-		conditionID = c.tokenConditionMap[tokenID]
-	}
-	if conditionID == "" {
-		return false
-	}
 	if !c.isFreshLocked(c.marketInfoCachedAt[conditionID]) {
-		return false
+		return nil
 	}
 	c.touchConditionLocked(conditionID, time.Now())
-	return true
-}
-
-func (c *Client) hasFreshMarketInfoForCondition(conditionID string) bool {
-	c.cacheMu.Lock()
-	defer c.cacheMu.Unlock()
-
-	if !c.isFreshLocked(c.marketInfoCachedAt[conditionID]) {
-		return false
-	}
-	c.touchConditionLocked(conditionID, time.Now())
-	return true
+	return c.marketInfos[conditionID]
 }
 
 func (c *Client) getCachedConditionID(tokenID string) (string, bool) {
@@ -496,14 +443,6 @@ func (c *Client) getCachedConditionID(tokenID string) (string, bool) {
 	}
 	c.touchTokenLocked(tokenID, time.Now())
 	return conditionID, true
-}
-
-func (c *Client) getCachedFeeInfo(tokenID string) types.FeeInfo {
-	c.cacheMu.Lock()
-	defer c.cacheMu.Unlock()
-
-	c.touchTokenLocked(tokenID, time.Now())
-	return c.feeInfos[tokenID]
 }
 
 func (c *Client) ClearIdleMarketInfoCache() {
@@ -553,11 +492,14 @@ func (c *Client) clearIdleMarketInfoCacheLocked(now time.Time) {
 }
 
 func (c *Client) deleteConditionCacheLocked(conditionID string) {
-	tokenIDs := c.conditionTokenMap[conditionID]
-	for _, tokenID := range tokenIDs {
-		c.deleteTokenCacheLocked(tokenID)
+	if info := c.marketInfos[conditionID]; info != nil {
+		for _, token := range info.Tokens {
+			if c.tokenConditionMap[token.TokenID] == conditionID {
+				c.deleteTokenCacheLocked(token.TokenID)
+			}
+		}
 	}
-	delete(c.conditionTokenMap, conditionID)
+	delete(c.marketInfos, conditionID)
 	delete(c.marketInfoCachedAt, conditionID)
 	delete(c.marketInfoLastUsedAt, conditionID)
 }
@@ -566,7 +508,6 @@ func (c *Client) deleteTokenCacheLocked(tokenID string) {
 	delete(c.tickSizes, tokenID)
 	delete(c.negRisk, tokenID)
 	delete(c.feeRates, tokenID)
-	delete(c.feeInfos, tokenID)
 	delete(c.tokenConditionMap, tokenID)
 	delete(c.tokenConditionCachedAt, tokenID)
 	delete(c.tokenConditionLastUsedAt, tokenID)
@@ -593,7 +534,12 @@ func (c *Client) touchConditionLocked(conditionID string, now time.Time) {
 		c.marketInfoLastUsedAt = make(map[string]time.Time)
 	}
 	c.marketInfoLastUsedAt[conditionID] = now
-	for _, tokenID := range c.conditionTokenMap[conditionID] {
+	info := c.marketInfos[conditionID]
+	if info == nil {
+		return
+	}
+	for _, token := range info.Tokens {
+		tokenID := token.TokenID
 		if tokenID == "" {
 			continue
 		}

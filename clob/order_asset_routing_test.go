@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -117,5 +118,68 @@ func TestParseOrderAssetID(t *testing.T) {
 		id, err := parseOrderAssetID(value)
 		require.NoError(t, err)
 		require.Equal(t, int64(10), id.Int64())
+	}
+}
+
+// A different spelling of the same uint256 is a distinct asset key in CLOB market metadata.
+func TestCreateOrderV2RequiresExactMarketAsset(t *testing.T) {
+	const asset = "0x0a"
+	for _, warm := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cached=%t", warm), func(t *testing.T) {
+			var allowCorrectMarket atomic.Bool
+			var marketReads, posts atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.Method + " " + r.URL.Path {
+				case "GET /markets-by-token/" + asset:
+					_, _ = fmt.Fprint(w, `{"condition_id":"market"}`)
+				case "GET /clob-markets/market":
+					marketReads.Add(1)
+					id := "10"
+					if allowCorrectMarket.Load() {
+						id = asset
+					}
+					_, _ = fmt.Fprintf(w, `{"mts":0.01,"fd":{"r":0.1,"e":1},"t":[{"t":%q,"o":"yes"}]}`, id)
+				case "POST /order":
+					posts.Add(1)
+					_, _ = fmt.Fprint(w, `{"success":true}`)
+				default:
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusBadRequest)
+				}
+			}))
+			defer server.Close()
+
+			var signatures int
+			client := NewClient(server.URL, big.NewInt(137), func(_ string, _ []byte) ([]byte, error) {
+				signatures++
+				return make([]byte, 65), nil
+			}, nil)
+			auth := &sdktypes.AuthOption{SingerAddress: "0x0000000000000000000000000000000000000001", ApiKeyCreds: &sdktypes.ApiKeyCreds{ApiKey: "key", Secret: "c2VjcmV0"}}
+			tick := "0.01"
+			balance := 10.0
+			order := types.UserOrderV2{TokenId: asset, Side: types.BUY, Size: 10, Price: 0.5, TickSize: &tick, UserUsdcBalance: &balance}
+			if warm {
+				// Both the requested asset and the caller-supplied market have fresh, unrelated entries.
+				client.storeMarketInfo("other", &types.CLOBMarketInfo{Tokens: []types.CLOBMarketInfoToken{{TokenID: asset}}})
+				client.storeMarketInfo("market", &types.CLOBMarketInfo{Tokens: []types.CLOBMarketInfoToken{{TokenID: "10"}}})
+				condition := "market"
+				order.ConditionId = &condition
+			}
+			ctx := context.Background()
+			_, err := client.CreateOrderV2(ctx, &order, types.OrderTypeFAK, false, true, auth)
+			require.ErrorContains(t, err, "market market does not include asset 0x0a")
+			require.Zero(t, signatures)
+			require.Zero(t, posts.Load())
+			require.Equal(t, 10.0, order.Size)
+			previousReads := marketReads.Load()
+			allowCorrectMarket.Store(true)
+			_, err = client.CreateOrderV2(ctx, &order, types.OrderTypeFAK, false, true, auth)
+			require.NoError(t, err)
+			require.Equal(t, previousReads+1, marketReads.Load())
+			require.InDelta(t, 10/1.05, order.Size, 1e-10)
+			require.Equal(t, 1, signatures)
+			require.Equal(t, int32(1), posts.Load())
+		})
 	}
 }
