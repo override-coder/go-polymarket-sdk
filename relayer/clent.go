@@ -72,9 +72,14 @@ func (c *Client) GetNonce(signerAddress string, signerType types.TransactionType
 
 // GetTransaction
 func (c *Client) GetTransaction(transactionID string) ([]types.RelayerTransaction, error) {
+	return c.GetTransactionContext(context.Background(), transactionID)
+}
+
+// GetTransactionContext queries a transaction using the caller's cancellation and deadline.
+func (c *Client) GetTransactionContext(ctx context.Context, transactionID string) ([]types.RelayerTransaction, error) {
 	var resp []types.RelayerTransaction
 
-	res, err := c.client.DoRequest(context.Background(), http.MethodGet, types.GET_TRANSACTION, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_TRANSACTION, &http2.RequestOptions{
 		Params: map[string]any{
 			"id": transactionID},
 	}, &resp)
@@ -293,7 +298,7 @@ func (c *Client) PollUntilState(
 
 	polls := 0
 	for {
-		txns, err := c.GetTransaction(transactionID)
+		txns, err := c.GetTransactionContext(ctx, transactionID)
 		if err != nil {
 			return nil, fmt.Errorf("get transaction failed: %w", err)
 		}

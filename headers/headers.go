@@ -46,6 +46,10 @@ func CreateL2Headers(
 	l2HeaderArgs types.L2HeaderArgs,
 	tsOpt *int64,
 ) (map[string]string, error) {
+	if creds == nil {
+		return nil, fmt.Errorf("L2 API credentials are required")
+	}
+
 	ts := time.Now().Unix()
 	if tsOpt != nil {
 		ts = *tsOpt
@@ -69,6 +73,10 @@ func CreateL2BuilderHeaders(
 	headerArgs types.L2HeaderArgs,
 	tsOpt *int64,
 ) (map[string]string, error) {
+	if creds == nil {
+		return nil, fmt.Errorf("builder API credentials are required")
+	}
+
 	ts := time.Now().Unix()
 	if tsOpt != nil {
 		ts = *tsOpt
