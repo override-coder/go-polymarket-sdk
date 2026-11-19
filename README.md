@@ -41,3 +41,34 @@ ExchangeV3 字段对应 0xe3333700cA9d93003F00f0F71f8515005F6c00Aa，现有额�
 FOK/FAK BUY 的 Size 为抵押资产金额。传入 UserUsdcBalance 时，SDK 预留已知手续费，
 并在金额不足时缩减 Size，包括缩减后小于 1 的情况，与 ts-sdk 的 maxSpend 处理一致。
 调用方应核对平台最低订单要求与实际响应，继续通过订单和成交查询确认执行结果。
+
+## Relayer 查询与错误处理
+
+GetTransaction(id) 保持原接口；需要取消或超时控制时使用
+GetTransactionContext(ctx, id)。PollUntilState 的 ctx 同时控制正在执行的 HTTP 查询和轮询等待。
+取消轮询不会取消已提交的链上交易；保留 transaction ID，之后继续查询结果。
+
+CreateL2Headers 和 CreateL2BuilderHeaders 在凭据指针为 nil 时返回 error。
+这不是凭据有效性验证，过期、撤销或不完整凭据仍应按接口错误处理。
+Safe/Deposit 提交入口仍须传入有效 AuthOption、签名函数及所需凭据。
+
+## SDK 交付验证边界
+
+生产构建及测试包编译可在干净 checkout 执行：
+
+```sh
+go build -mod=mod ./...
+go test -mod=mod ./... -run '^$'
+go vet -mod=mod ./...
+go test -mod=mod -race ./headers ./relayer -run '^(TestMissingCredentials|TestCredentialHeaders|TestPollUntilStateCancelsInFlightRequest|TestGetTransactionCompatibility)$'
+go test -mod=mod -race ./clob -run '^(TestFetchBalanceAllowance.*|TestMarketBuyBudgetBelowOne|TestCreateOrderV2HonorsSmallMarketBuyBudget)$'
+```
+
+上述命令不发起真实交易。不要将全仓无筛选的 go test 作为离线验收：其他包仍有历史联网测试。
+旧 clob/auth_test.go 需 polymarket_legacy_live 标签才参与编译；无签名密钥的旧认证/下单用例跳过，
+有效的显式实盘入口见 [integration/live](integration/live/README.md)，凭据仅通过环境变量提供。
+
+本次交付限 SDK：订单路由维持从资产 ID 识别交易所，不新增 version/resolutionStatus 入参或交易期间的 Gamma 查询。
+价格取整维持现有兼容行为；调用方应按市场步长传价格，并核对最终签单/成交金额。
+watcher 的链上持仓合约选择不属于本次 SDK 修改。仅离线构建和回归不能证明真实赎回已成功，
+实盘验收结果应另行记录订单 ID、交易哈希与回执。

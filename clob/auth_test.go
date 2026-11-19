@@ -1,6 +1,9 @@
+//go:build polymarket_legacy_live
+
 package clob_test
 
 import (
+	"context"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/override-coder/go-polymarket-sdk/clob"
@@ -9,6 +12,7 @@ import (
 	"github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 )
@@ -29,8 +33,9 @@ func signature(signer string, digest []byte) ([]byte, error) {
 }
 
 func TestClient(t *testing.T) {
+	t.Skip("legacy authentication fixture has no signing key; use integration/live")
 	client := clob.NewClient(PolymarketClobURL, chaindId, signature, nil)
-	key, err := client.DeriveAPIKey(big.NewInt(1), &sdktypes.AuthOption{
+	key, err := client.DeriveAPIKey(context.Background(), big.NewInt(1), &sdktypes.AuthOption{
 		SignatureType: model.POLY_GNOSIS_SAFE,
 		SingerAddress: "0x8c5f23249462e20C4a202Ad35275562075F37e09",
 		FunderAddress: "0x3BfD9C49E5B62cBc4b7DcE1b7a1f8123B515D278",
@@ -42,7 +47,7 @@ func TestClient(t *testing.T) {
 func TestGetTickSize(t *testing.T) {
 	client := clob.NewClient(PolymarketClobURL, chaindId, signature, nil)
 	tokenID := "108743709732442130739073851488597967747030701044009651663118921104082786836017"
-	size, err := client.GetTickSize(tokenID)
+	size, err := client.GetTickSize(context.Background(), tokenID)
 	assert.Nil(t, err)
 	t.Logf("%+v", size)
 
@@ -50,16 +55,17 @@ func TestGetTickSize(t *testing.T) {
 	assert.Nil(t, err)
 	t.Logf("%+v", risk)
 
-	rateBps, err := client.GetMarketPrice(tokenID, "BUY")
+	rateBps, err := client.GetMarketPrice(context.Background(), tokenID, "BUY")
 	assert.Nil(t, err)
 	t.Logf("%+v", rateBps)
 }
 
 func TestPostOrder(t *testing.T) {
+	t.Skip("legacy authentication fixture has no signing key; use integration/live")
 	client := clob.NewClient(PolymarketClobURL, chaindId, signature, &sdktypes.BuilderApiKeyCreds{
-		Key:        "019a4dec-fc6a-79ba-8937-d9bf3c2792ca",
-		Secret:     "Q23ZHyR21V5_F8qVLvOvnXGhxtW6CmNCWDjHzFJQW7k=",
-		Passphrase: "2a171196ddfe34aab62eea32ed63fe424fde8144413982dd90527c844cf2e8d3",
+		Key:        os.Getenv("POLY_BUILDER_API_KEY"),
+		Secret:     os.Getenv("POLY_BUILDER_SECRET"),
+		Passphrase: os.Getenv("POLY_BUILDER_PASSPHRASE"),
 	})
 
 	authOption := &sdktypes.AuthOption{
@@ -67,19 +73,19 @@ func TestPostOrder(t *testing.T) {
 		SingerAddress: "0x8c5f23249462e20C4a202Ad35275562075F37e09",
 		FunderAddress: "0x3BfD9C49E5B62cBc4b7DcE1b7a1f8123B515D278",
 	}
-	_, err := client.EnsureAPIKey(big.NewInt(0), authOption)
+	_, err := client.EnsureAPIKey(context.Background(), big.NewInt(0), authOption)
 	assert.Nil(t, err)
 
-	orders, err := client.GetOrders(types.GetActiveOrdersRequest{}, authOption)
+	orders, err := client.GetOrders(context.Background(), types.GetActiveOrdersRequest{}, authOption)
 	assert.Nil(t, err)
 
 	if len(orders.Data) > 0 {
-		getOrder, err := client.GetOrder(orders.Data[0].ID, types.GetOrderRequest{}, authOption)
+		getOrder, err := client.GetOrder(context.Background(), orders.Data[0].ID, types.GetOrderRequest{}, authOption)
 		assert.Nil(t, err)
 		t.Logf("%+v", getOrder)
 	}
 
-	return
+	t.Skip("legacy order submission disabled; use integration/live")
 	expiration := time.Now().Add(2 * time.Minute).Unix()
 	userOrder := types.UserOrder{
 		TokenID:    "29932229206038996544221694126815434341861961592336413071656609906503218641045",
@@ -89,7 +95,7 @@ func TestPostOrder(t *testing.T) {
 		Expiration: &expiration,
 	}
 
-	order, err := client.CreateOrder(userOrder, types.OrderTypeGTD, false, authOption)
+	order, err := client.CreateOrder(context.Background(), userOrder, types.OrderTypeGTD, false, authOption)
 	assert.Nil(t, err)
 	t.Logf("%+v", order)
 }
