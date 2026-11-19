@@ -93,17 +93,32 @@ func (c *Client) CreateBuilderApiKey(ctx context.Context, option *sdktypes.AuthO
 }
 
 func (c *Client) GetBalanceAllowance(option *sdktypes.AuthOption) (*types.BalanceAllowanceResponse, error) {
-	requestPath := fmt.Sprintf("%s", types.GET_BALANCE_ALLOWANCE)
+	return c.FetchBalanceAllowance(context.Background(), types.BalanceAllowanceRequest{
+		AssetType: types.AssetTypeCollateral,
+	}, option)
+}
 
-	ts := time.Now().Unix()
-	l2HeaderArgs := types.L2HeaderArgs{
-		Method:      http.MethodGet,
-		RequestPath: requestPath,
+// FetchBalanceAllowance reads collateral or position balances for the funding wallet.
+// Use CONDITIONAL for CTF tokens and CONDITIONAL-V2 for Protocol V2 positions.
+func (c *Client) FetchBalanceAllowance(ctx context.Context, request types.BalanceAllowanceRequest, option *sdktypes.AuthOption) (*types.BalanceAllowanceResponse, error) {
+	if option == nil || option.ApiKeyCreds == nil {
+		return nil, fmt.Errorf("balance allowance requires CLOB credentials")
 	}
-
-	params := make(map[string]any)
-	params["asset_type"] = "COLLATERAL"
-	params["signature_type"] = 2
+	switch request.AssetType {
+	case types.AssetTypeCollateral, types.AssetTypeConditional, types.AssetTypeConditionalV2:
+	default:
+		return nil, fmt.Errorf("unsupported balance allowance asset type %q", request.AssetType)
+	}
+	requestPath := types.GET_BALANCE_ALLOWANCE
+	ts := time.Now().Unix()
+	l2HeaderArgs := types.L2HeaderArgs{Method: http.MethodGet, RequestPath: requestPath}
+	params := map[string]any{
+		"asset_type":     request.AssetType,
+		"signature_type": option.SignatureType,
+	}
+	if request.TokenID != "" {
+		params["token_id"] = request.TokenID
+	}
 
 	l2Headers, err := headers.CreateL2Headers(option.SingerAddress, option.ApiKeyCreds, l2HeaderArgs, &ts)
 	if err != nil {
@@ -111,7 +126,7 @@ func (c *Client) GetBalanceAllowance(option *sdktypes.AuthOption) (*types.Balanc
 	}
 
 	var resp types.BalanceAllowanceResponse
-	res, err := c.client.DoRequest(context.Background(), http.MethodGet, requestPath, &http2.RequestOptions{
+	res, err := c.client.DoRequest(ctx, http.MethodGet, requestPath, &http2.RequestOptions{
 		Headers: l2Headers,
 		Params:  params,
 	}, &resp)

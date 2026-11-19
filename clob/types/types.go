@@ -310,9 +310,23 @@ type CancelOrder struct {
 	NotCanceled map[string]string `json:"not_canceled"`
 }
 
+type AssetType string
+
+const (
+	AssetTypeCollateral    AssetType = "COLLATERAL"
+	AssetTypeConditional   AssetType = "CONDITIONAL"
+	AssetTypeConditionalV2 AssetType = "CONDITIONAL-V2"
+)
+
+type BalanceAllowanceRequest struct {
+	AssetType AssetType
+	TokenID   string
+}
+
 type BalanceAllowanceResponse struct {
 	Balance    string `json:"balance"`
 	Allowances struct {
+		ExchangeV3           string `json:"0xe3333700cA9d93003F00f0F71f8515005F6c00Aa"`
 		CTFExchange          string `json:"0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"`
 		NegRiskCtfExchange   string `json:"0xC5d563A36AE78145C45a50134d48A1215220f80a"`
 		CTFExchangeV2        string `json:"0xE111180000d2663C0091e4f400237545B87B996B"`
