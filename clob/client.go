@@ -283,6 +283,9 @@ func (c *Client) GetLastTradePrices(ctx context.Context, prices []types.LastTrad
 }
 
 func (c *Client) orderMarketInfo(ctx context.Context, tokenID string, conditionId *string) (*types.CLOBMarketInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	conditionID := ""
 	if conditionId != nil {
 		conditionID = *conditionId
@@ -291,12 +294,12 @@ func (c *Client) orderMarketInfo(ctx context.Context, tokenID string, conditionI
 	if conditionID == "" {
 		cachedConditionID, ok := c.getCachedConditionID(tokenID)
 		if !ok {
-			value, err, _ := c.marketByTokenSingleflight.Do(tokenID, func() (any, error) {
+			value, err := sharedMarketLookup(ctx, &c.marketByTokenSingleflight, tokenID, func(fetchCtx context.Context) (any, error) {
 				if cachedConditionIDSF, okSF := c.getCachedConditionID(tokenID); okSF {
 					return cachedConditionIDSF, nil
 				}
 
-				result, err := c.getMarketByAssetID(ctx, tokenID)
+				result, err := c.getMarketByAssetID(fetchCtx, tokenID)
 				if err != nil {
 					return "", err
 				}
@@ -357,15 +360,18 @@ func (c *Client) getClobMarketInfo(ctx context.Context, conditionID string) (*ty
 }
 
 func (c *Client) getClobMarketInfoCached(ctx context.Context, conditionID string) (*types.CLOBMarketInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if info := c.cachedMarketInfo(conditionID); info != nil {
 		return info, nil
 	}
 
-	value, err, _ := c.marketInfoSingleflight.Do(conditionID, func() (any, error) {
+	value, err := sharedMarketLookup(ctx, &c.marketInfoSingleflight, conditionID, func(fetchCtx context.Context) (any, error) {
 		if info := c.cachedMarketInfo(conditionID); info != nil {
 			return info, nil
 		}
-		return c.getClobMarketInfo(ctx, conditionID)
+		return c.getClobMarketInfo(fetchCtx, conditionID)
 	})
 	if err != nil {
 		return nil, err
@@ -582,4 +588,27 @@ func (c *Client) isFreshLocked(cachedAt time.Time) bool {
 		return true
 	}
 	return time.Since(cachedAt) <= c.marketInfoCacheTTL
+}
+
+// A shared public-market fetch outlives any individual waiter, but is bounded.
+// Context values (e.g. an injected transport's routing metadata) come from the
+// first waiter. Cancellation/deadlines are local to each caller.
+func sharedMarketLookup(ctx context.Context, group *singleflight.Group, key string, fetch func(context.Context) (any, error)) (any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	result := group.DoChan(key, func() (any, error) {
+		fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		return fetch(fetchCtx)
+	})
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case response := <-result:
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return response.Val, response.Err
+	}
 }
