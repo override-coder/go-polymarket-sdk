@@ -272,8 +272,10 @@ type OpenOrder struct {
 }
 
 type GetActiveOrdersRequest struct {
-	ID     string `json:"id,omitempty" url:"id,omitempty"`
-	Market string `json:"market,omitempty" url:"market,omitempty"`
+	// NextCursor continues a page returned by GetOrders; nil starts at the first page.
+	NextCursor *string `json:"next_cursor,omitempty" url:"next_cursor,omitempty"`
+	ID         string  `json:"id,omitempty" url:"id,omitempty"`
+	Market     string  `json:"market,omitempty" url:"market,omitempty"`
 	// AssetID requires a nonblank Market (condition ID).
 	AssetID string `json:"asset_id,omitempty" url:"asset_id,omitempty"`
 }

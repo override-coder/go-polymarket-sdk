@@ -225,6 +225,10 @@ func (c *Client) GetOrders(ctx context.Context, req types.GetActiveOrdersRequest
 		params["asset_id"] = req.AssetID
 	}
 
+	if req.NextCursor != nil && *req.NextCursor != "" {
+		params["next_cursor"] = *req.NextCursor
+	}
+
 	var resp types.OpenOrders
 	res, err := c.client.DoRequest(ctx, http.MethodGet, types.GET_OPEN_ORDERS, &http2.RequestOptions{
 		Headers: l2Headers,
