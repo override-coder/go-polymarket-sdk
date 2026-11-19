@@ -252,6 +252,8 @@ type GetOrderRequest struct {
 
 // OpenOrder 对象
 type OpenOrder struct {
+	MakerAddress string `json:"maker_address,omitempty"`
+	OrderType    string `json:"order_type,omitempty"`
 	// Deprecated: CLOB no longer guarantees this field. Use trade records to track fills; an empty list does not prove no fills.
 	AssociateTrades []string `json:"associate_trades"`
 	ID              string   `json:"id"`
