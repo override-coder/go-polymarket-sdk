@@ -36,8 +36,14 @@ func (c *Client) GetEventsByID(ctx context.Context, id string) (*types.Event, er
 }
 
 func (c *Client) GetEventsByKeyset(ctx context.Context, params *types.GetEventsKeysetParams) (*types.GetEventsKeysetResponse, error) {
+	if params == nil {
+		return nil, fmt.Errorf("get events keyset params is nil")
+	}
 	u := url.URL{Path: types.GET_EVENTS_KEYSET}
 	qs := url.Values{}
+	if err := addProtocolVersions(qs, params.Versions); err != nil {
+		return nil, err
+	}
 
 	if params.Active != nil {
 		qs.Set("active", strconv.FormatBool(*params.Active))

@@ -8,6 +8,7 @@ import (
 )
 
 type Event struct {
+	Version           *string          `json:"version"`
 	ID                string           `json:"id"`
 	Ticker            *string          `json:"ticker"`
 	Slug              *string          `json:"slug"`
@@ -117,6 +118,8 @@ type OptimizedImage struct {
 }
 
 type Market struct {
+	Version               *string          `json:"version"`
+	ResolutionStatus      *string          `json:"resolutionStatus"`
 	ID                    string           `json:"id"`
 	Question              *string          `json:"question"`
 	ConditionID           string           `json:"conditionId"`
@@ -436,8 +439,10 @@ type SearchPagination struct {
 }
 
 type GetMarketsParams struct {
-	Limit  int `json:"limit"`
-	Offset int `json:"offset"`
+	// Versions filters protocols; omitted leaves the server default unchanged.
+	Versions []string `json:"version,omitempty"`
+	Limit    int      `json:"limit"`
+	Offset   int      `json:"offset"`
 
 	Order     *string `json:"order,omitempty"`
 	Ascending *bool   `json:"ascending,omitempty"`
@@ -469,10 +474,13 @@ type GetMarketsParams struct {
 }
 
 type GetMarketsKeysetParams struct {
-	Limit       *int    `json:"limit,omitempty"`
-	Order       *string `json:"order,omitempty"`
-	Ascending   *bool   `json:"ascending,omitempty"`
-	AfterCursor *string `json:"after_cursor,omitempty"`
+	ResolutionStatus *string `json:"resolution_status,omitempty"`
+	// Versions filters protocols; omitted leaves the server default unchanged.
+	Versions    []string `json:"version,omitempty"`
+	Limit       *int     `json:"limit,omitempty"`
+	Order       *string  `json:"order,omitempty"`
+	Ascending   *bool    `json:"ascending,omitempty"`
+	AfterCursor *string  `json:"after_cursor,omitempty"`
 
 	ID                []uint64         `json:"id,omitempty"`
 	Slug              []string         `json:"slug,omitempty"`
@@ -530,6 +538,8 @@ type PublicProfileUser struct {
 }
 
 type GetEventsKeysetParams struct {
+	// Versions filters protocols; omitted leaves the server default unchanged.
+	Versions     []string `json:"version,omitempty"`
 	Active       *bool    `json:"active,omitempty"`
 	Closed       *bool    `json:"closed,omitempty"`
 	TagSlug      *string  `json:"tag_slug,omitempty"`

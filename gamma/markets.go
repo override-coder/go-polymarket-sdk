@@ -44,6 +44,9 @@ func (c *Client) GetMarkets(ctx context.Context, p *types.GetMarketsParams) ([]*
 
 	u := url.URL{Path: types.GET_MARKETS}
 	qs := url.Values{}
+	if err := addProtocolVersions(qs, p.Versions); err != nil {
+		return nil, err
+	}
 	qs.Set("limit", strconv.Itoa(p.Limit))
 	qs.Set("offset", strconv.Itoa(p.Offset))
 
@@ -163,6 +166,18 @@ func (c *Client) GetMarketsByKeyset(ctx context.Context, p *types.GetMarketsKeys
 
 	u := url.URL{Path: types.GET_MARKETS_KEYSET}
 	qs := url.Values{}
+	if err := addProtocolVersions(qs, p.Versions); err != nil {
+		return nil, err
+	}
+
+	if p.ResolutionStatus != nil {
+		switch *p.ResolutionStatus {
+		case "inactive", "active", "resolved":
+			qs.Set("resolution_status", *p.ResolutionStatus)
+		default:
+			return nil, fmt.Errorf("unsupported resolution status %q", *p.ResolutionStatus)
+		}
+	}
 
 	if p.Limit != nil {
 		qs.Set("limit", strconv.Itoa(*p.Limit))
