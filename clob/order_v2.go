@@ -257,6 +257,10 @@ func adjustBuyAmountForFees(
 	totalCost := amount + platformFee + amount*builderTakerFeeRate
 
 	if userUSDCBalance <= totalCost {
+		adjustAmount := userUSDCBalance / (1 + platformFeeRate/price + builderTakerFeeRate)
+		if adjustAmount >= 1 {
+			return adjustAmount
+		}
 		return userUSDCBalance / (1 + platformFeeRate/price + builderTakerFeeRate)
 	}
 	return amount
